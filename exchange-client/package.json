@@ -1,12 +1,12 @@
 {
   "name": "exchange-client",
-  "homepage": "https://zevmm.github.io/ExchangeClient",
+  "homepage": "https://zevmm.github.io/ColumbiaTradingCompetition",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "predev": "node setIP.js",
-    "dev": "npm run predev && vite",
+    "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
