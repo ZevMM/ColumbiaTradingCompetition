@@ -1,0 +1,178 @@
+<html>
+
+<!-- 
+    THIS IS VERY SLOW/OUTDATED VS ACTUAL ORDERBOOK! JS ISSUE or ORDERBOOK latency?
+    I Think it is just js plotting being a bit slow
+-->
+<!-- Plotly.js -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+<script src="p5.js"></script>
+<script>
+    ws = new WebSocket("ws://127.16.123.0:4000/orders/ws")
+    // todo: maintain pointer to cross
+    // format: index is price, number is total amount at price level.
+    high_buy = 10
+    low_sell = 0
+    orderbooks = {
+        "AAPL": {
+            "scale_factor": 1,
+            "depth_chart_buy": [],
+            "depth_chart_sell": []
+        },
+        "JNJ": {
+            "scale_factor": 1,
+            "depth_chart_buy": [],
+            "depth_chart_sell": []
+        }
+    }
+
+    cansize = 400;
+    x_axis_offset = cansize - 40;
+    scale_factor = 10;
+
+    function update_viz(symbol) {
+        textAlign(CENTER, BOTTOM);
+        background(220);
+        textSize(10);
+        
+        buy_pointer = high_buy;
+        col_width = cansize / orderbooks[symbol]["depth_chart_buy"].length
+        running_buy_interest = 0;
+        fill('rgb(0,255,0)');
+        while (buy_pointer >= 0) {
+            fill('rgb(0,255,0)');
+            running_buy_interest += orderbooks[symbol]["depth_chart_buy"][buy_pointer]
+            rect(buy_pointer * col_width, x_axis_offset - running_buy_interest * orderbooks[symbol]["scale_factor"], col_width, running_buy_interest * orderbooks[symbol]["scale_factor"])
+            fill('rgb(0,0,0)');
+            text(buy_pointer, buy_pointer * col_width + col_width/2, x_axis_offset + 15)
+            if (running_buy_interest > 0){
+                fill('rgb(0,0,0)');
+                text(running_buy_interest, buy_pointer * col_width + col_width/2, x_axis_offset - running_buy_interest * orderbooks[symbol]["scale_factor"])
+                fill('rgb(0,255,0)');
+            }
+            // console.log(buy_pointer * col_width, x_axis_offset, col_width, running_buy_interest*10);
+            buy_pointer -= 1;
+        }        
+
+        running_sell_interest = 0;
+        sell_pointer = low_sell;
+        fill('rgb(255,0,0)');
+        while (sell_pointer < orderbooks[symbol]["depth_chart_sell"].length) {
+            running_sell_interest += orderbooks[symbol]["depth_chart_sell"][sell_pointer]
+            rect(sell_pointer * col_width, x_axis_offset - running_sell_interest * orderbooks[symbol]["scale_factor"], col_width, running_sell_interest * orderbooks[symbol]["scale_factor"])
+            if (running_sell_interest > 0){
+                fill('rgb(0,0,0)');
+                text(running_sell_interest, sell_pointer * col_width + col_width/2, x_axis_offset - running_sell_interest * orderbooks[symbol]["scale_factor"])
+                fill('rgb(255,0,0)');
+            }
+            // console.log(sell_pointer * col_width, x_axis_offset, col_width, running_buy_interest*10);
+            sell_pointer += 1;
+        }
+        
+        orderbooks[symbol]["scale_factor"] = (cansize/2)/Math.max(running_buy_interest, running_sell_interest)
+        // console.log(running_buy_interest, running_sell_interest)
+        // console.log(Math.max(running_buy_interest, running_sell_interest))
+        // console.log(scale_factor)
+        
+        textAlign(LEFT, TOP);
+        fill('rgb(0,0,0)');
+        textSize(20);
+        text(symbol, 10, 10)
+        textSize(15);
+        text("Total Resting Buy Volume: " + running_buy_interest, 10,  30)
+        text("Total Resting Sell Volume: " + running_sell_interest, 10,  45)
+    }
+
+    function select_evt() {
+        update_viz(sel.value())
+        update_viz(sel.value())
+    }
+
+    function setup() {
+        textAlign(LEFT, TOP);
+        createCanvas(cansize, cansize);
+        textSize(20);
+        frameRate(60);
+        background(220)
+        sel = createSelect();
+        sel.position(cansize - 80, 20);
+        for (var key in orderbooks) {
+            if (orderbooks.hasOwnProperty(key)) {
+                sel.option(key);
+            }
+        }
+        sel.changed(select_evt);
+        // select_evt()
+    }
+
+
+
+    start_up_message = true;
+    // receive a message from the server
+    ws.onmessage = function (evt) {
+
+        if (!start_up_message) {
+            data = evt.data;
+            console.log("data", data);
+
+            
+
+            const packet = JSON.parse(data);
+
+            console.log("message type", packet["message_type"])
+
+            console.log(typeof packet);
+            console.log("level", packet["level"]);
+            console.log("total_order_vol", packet["total_order_vol"]);
+            console.log("side", packet["side"]);
+
+            const level = parseInt(packet["level"])
+            const side = packet["side"]
+            const total_order_vol = parseInt(packet["total_order_vol"])
+            const symbol = packet["symbol"]
+
+            if (packet["side"] == "Buy") {
+                console.log("updating buy side")
+                orderbooks[symbol]["depth_chart_buy"][level] = total_order_vol
+            } else if (packet["side"] == "Sell") {
+                console.log("updating sell side")
+                orderbooks[symbol]["depth_chart_sell"][level] = total_order_vol
+            }
+            if (sel.value() == symbol) {
+                update_viz(symbol);
+            }
+        } else {
+            data = evt.data;
+            start_up_message = false
+            // this is the orderbook dump
+            const packet = JSON.parse(data);
+            // console.log(packet)
+            for (var orderbook in packet) {
+                // console.log(orderbook)
+                if (orderbooks.hasOwnProperty(orderbook)) {
+                    packet[orderbook]["buy_side_limit_levels"].forEach((x, i) => {
+                        console.log("sm bs", i, x);
+                        orderbooks[orderbook]["depth_chart_buy"][i] = parseInt(x["total_volume"])
+                    });
+                    packet[orderbook]["sell_side_limit_levels"].forEach((x, i) => {
+                        console.log("sm ss", i, x);
+                        orderbooks[orderbook]["depth_chart_sell"][i] = parseInt(x["total_volume"])
+                    });
+                }
+            }
+            update_viz(sel.value());
+            update_viz(sel.value());
+        }
+    };
+
+    ws.onclose = function () {
+        // websocket is closed.
+        console.log("WS Conn closed :(")
+    };
+</script>
+
+<body>
+</body>
+
+</html>

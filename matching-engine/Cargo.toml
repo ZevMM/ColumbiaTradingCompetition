@@ -1,0 +1,67 @@
+[package]
+name = "exchange_simulator"
+version = "0.1.0"
+edition = "2021"
+authors = ["spethmccraryc@gmail.com"]
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+bytes = "0.4.12"
+serde = { version = "1", features = ["derive"]}
+serde_json = {version = "1.0"}
+
+[dependencies]
+# orderbook dependencies
+csv = "1.1"
+plotters = "0.3"
+serde = { version = "1", features = ["derive"]}
+openssl = { version = "0.10", features = ["vendored"] }
+
+
+# server dependencies
+actix-web = "4"
+actix-cors = "0.6.1"
+serde_json = {version = "1.0"}
+env_logger = "0.10.0"
+pretty_env_logger = "0.4.0"
+log = "0.4.17"
+
+# Websockets dependencies
+actix = "0.13.0"
+actix-web-actors = "4.2.0"
+derive_more = "0.99.0"
+
+# testing
+tokio = { version = "1", features = ["full"] }
+
+# accounts
+enum-map = "2.4.2"
+queues = "1.0.2"
+# sending fill messages between accounts.
+actix-broker = "0.4.3"
+
+# parser
+fefix = {version="0.7.0", features = ["fix42"]}
+prefix = "1.0.4"
+# macro help
+strum = "0.24.1"
+strum_macros = "0.24.3"
+paste = "1.0.11"
+
+# needed for reconstructing state
+rev_lines = "0.3.0"
+
+[dependencies.uuid]
+version = "1.2.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+    "serde"
+]
+[[bin]]
+name = "main"
+path = "src/main.rs"
+

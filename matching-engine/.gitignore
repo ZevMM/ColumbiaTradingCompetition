@@ -1,0 +1,9 @@
+target/
+flamegraph.svg
+misc_test/p5.js
+misc_test/test_orders.csv
+python_bots/file.log
+test.log
+test2.log
+.DS_Store
+trading_sim/

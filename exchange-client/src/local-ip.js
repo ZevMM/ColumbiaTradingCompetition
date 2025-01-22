@@ -1,0 +1,1 @@
+const addr = "wss://192.168.1.73:443/orders/ws"; export default addr

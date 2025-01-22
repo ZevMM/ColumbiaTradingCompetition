@@ -1,0 +1,26 @@
+{   
+    "max_price_cents": 50,
+    "assets": [
+        {
+            "symbol": "AD",
+            "long_name": "Average decible reading",
+            "max_price_cents": 50
+        },
+        {
+            "symbol": "TS",
+            "long_name": "Times Square Webcam Brightness",
+            "max_price_cents": 50
+        },
+        {
+            "symbol": "TT",
+            "long_name": "Average wait for 1 train at 116th (closest 8 times)",
+            "max_price_cents": 50
+        }
+    ],
+    "accounts": [
+        {"trader_id": "anniem2716", "password": "kjUn"},
+        {"trader_id": "sethmend60", "password": "ovsC"},
+        {"trader_id": "zem2109", "password": "0000"},
+        {"trader_id": "Price_Enforcer", "password": "penf"}
+    ]
+}
