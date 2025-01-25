@@ -17,7 +17,7 @@ let placeOrder = (e, side, user, ws) => {
     ws.send(JSON.stringify(message))
 }
 
-function OrderForm({ws, user, all_tickers}) {
+function OrderForm({ws, user, all_tickers, maxprice}) {
     let side;
     return (
     <div style={{display: "flex", flexDirection:"column",alignItems:"center", justifyContent:"center", height:"100%", width:"100%"}}>
@@ -36,12 +36,12 @@ function OrderForm({ws, user, all_tickers}) {
         
         <div style={{display:"flex",flexDirection:"column", width:"70%"}}>
         <label htmlFor="price">Price (<img src={token} style={{width:"12px"}} />)</label>
-        <input id="price" name="price" type="number" style={{width:"100%", boxSizing:"border-box"}} required/>
+        <input id="price" name="price" type="number" style={{width:"100%", boxSizing:"border-box"}} min="0" max={maxprice} required/>
         </div>
 
         <div style={{display:"flex",flexDirection:"column", width:"70%"}}>
         <label htmlFor="amount">Amount</label>
-        <input id="amount" name="amount" type="number" style={{width:"100%", boxSizing:"border-box"}} required/>
+        <input id="amount" name="amount" type="number" style={{width:"100%", boxSizing:"border-box"}} min="1" required/>
         </div>
 
         <div style={{display:"flex", flexDirection:"row", width:"70%", justifyContent:"space-between"}}>

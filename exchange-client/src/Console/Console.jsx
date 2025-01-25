@@ -11,7 +11,8 @@ function Console({ws, user, game, account}) {
   if (!game || !account) { return <div>Loading...</div> }
   
   const [cur_ticker, setCur_ticker] = useState(Object.keys(game)[0]);
-  const all_tickers = Object.keys(game)
+  const all_tickers = Object.keys(game);
+  const maxprice = game[all_tickers[0]].buy_side_limit_levels.length - 1;
 
   let cumsum_buy = []
   let lowbuy = game[cur_ticker].buy_side_limit_levels.findIndex((e) => e.total_volume > 0)
@@ -32,13 +33,14 @@ function Console({ws, user, game, account}) {
   }, 0)
   
   
+  
   return (
     <div style={{fontFamily:"IBM Plex Sans Condensed", color:"white"}}>
         <div style={{background: "#19191fff", width:"100%", height:"10%", "left": 0, "top":0, position:"absolute", boxShadow:"0 0px 2px rgba(0, 0, 0, 1)"}}>
             <StatsBar account={account} game={game} />
         </div>
         <div style={{background: "rgb(10, 10, 18)", width:"15%", height:"38%", "left": 0, "top":"10%", position:"absolute"}}>
-            <OrderForm ws={ws} user={user} all_tickers={all_tickers}/>
+            <OrderForm ws={ws} user={user} all_tickers={all_tickers} maxprice={maxprice}/>
         </div>
         <div style={{background: "rgb(10, 10, 18)", width:"15%", height:"38%", "left": "15%", "top":"10%", position:"absolute", borderLeft:"1px solid white"}}>
             <Tickers cur_ticker={cur_ticker} setCur_ticker={setCur_ticker} all_tickers={all_tickers} game={game}/>
