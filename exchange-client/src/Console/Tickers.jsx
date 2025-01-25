@@ -6,15 +6,15 @@ const pct_change = (price_history) => {
     let e = price_history.at(-1)[1];
     let c = 100 * (e - s) / s;
     if (c > 0) return (
-    <div style={{color: 'transparent', textShadow: "0 0 0 green", fontSize:"18px", marginLeft:"2px"}}>
+    <div style={{color: 'transparent', textShadow: "0 0 0 green", fontSize:"1.9vh", marginLeft:"2px"}}>
     +{c.toFixed(2)}%🔺
     </div>
     );
     if (c < 0) return (
-    <div style={{color: 'transparent', textShadow: "0 0 0 red", fontSize:"18px", marginLeft:"2px"}}>
+    <div style={{color: 'transparent', textShadow: "0 0 0 red", fontSize:"1.9vh", marginLeft:"2px"}}>
     {c.toFixed(2)}%🔻
     </div>);
-    return (<div style={{color:"grey", fontSize:"18px", marginLeft:"2px"}}>{c.toFixed(2)}%</div>);
+    return (<div style={{color:"grey", fontSize:"1.9vh", marginLeft:"2px"}}>{c.toFixed(2)}%</div>);
 }
 
 function Tickers({cur_ticker, setCur_ticker, all_tickers, game}) {
@@ -24,7 +24,7 @@ function Tickers({cur_ticker, setCur_ticker, all_tickers, game}) {
                     justifyContent:"space-around",
                     width:"100%",
                     height:"100%",
-                    fontSize:"36px"
+                    fontSize:"4vh"
                     }}>
             {
                 all_tickers.map((symbol) => {return (
@@ -34,7 +34,7 @@ function Tickers({cur_ticker, setCur_ticker, all_tickers, game}) {
                     { width:"100%", display:"flex", flexDirection:"row", justifyContent:"space-around"}}>
                     <div className="ibm-plex-sans-bold">{symbol}</div>
                     <div>
-                        <div>{game[symbol].price_history?.at(-1)?.[1]}<img src={token} style={{width:"20px"}}/></div>
+                        <div>{game[symbol].price_history?.at(-1)?.[1]}<img src={token} style={{width:"2.1vh"}}/></div>
                         {pct_change(game[symbol].price_history)}
                     </div>
                     </div>
