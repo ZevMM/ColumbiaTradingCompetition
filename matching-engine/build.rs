@@ -10,6 +10,8 @@ use std::io::BufReader;
 use serde::Deserialize;
 use serde_json::{self, Value};
 
+
+
 fn main() {
 
     // Reads in config file, generates enums etc., populates config.rs
@@ -22,6 +24,9 @@ fn main() {
 
     let assets_arr = value["assets"].as_array().unwrap();
     let accounts_arr = value["accounts"].as_array().unwrap();
+
+    let max_cents = value["max_price_cents"].as_i64().unwrap();
+
 
     let mut symbols = "[".to_owned();
 
@@ -222,7 +227,7 @@ macro_rules! generate_global_state {{
 macro_rules! init_orderbook {{
 ([$($value:ident),+]) => {{
     GlobalOrderBookState {{
-        $($value: Mutex::new(quickstart_order_book(TickerSymbol::$value,0,50,10000)), )*
+        $($value: Mutex::new(quickstart_order_book(TickerSymbol::$value,0,{},10000)), )*
     }}
     }};
 }}
@@ -258,7 +263,7 @@ impl GlobalAccountState {{
         }}
 }}
 ",
-        symbols.trim(), symbols.trim(), symbols.trim(), account_ids.trim(),  account_ids.trim(),  symbols.trim(), accounts.trim()
+        max_cents, symbols.trim(), symbols.trim(), symbols.trim(), account_ids.trim(),  account_ids.trim(),  symbols.trim(), accounts.trim()
     );
     let bytes = Bytes::from(content.trim());
     f.write_all(&bytes).unwrap();

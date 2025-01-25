@@ -214,6 +214,12 @@ fn add_order_to_book(
                         let canceled_order = self.buy_side_limit_levels[cancel_request.price]
                                 .orders
                                 .remove(index);
+                        
+                        let mut account = accounts_data.index_ref(canceled_order.trader_id).lock().unwrap();
+                        account.active_orders.retain(|&x| x.order_id != canceled_order.order_id);
+                        
+                        self.buy_side_limit_levels[cancel_request.price].total_volume -= canceled_order.amount;
+                        
                         relay_server_addr.do_send(Arc::new(OutgoingMessage::CancelOccurredMessage(CancelOccurredMessage{
                             side: OrderType::Buy,
                             amount: canceled_order.amount,
@@ -244,6 +250,8 @@ fn add_order_to_book(
                             
                             let mut account = accounts_data.index_ref(canceled_order.trader_id).lock().unwrap();
                             account.active_orders.retain(|&x| x.order_id != canceled_order.order_id);
+
+                            self.buy_side_limit_levels[cancel_request.price].total_volume -= canceled_order.amount;
 
                             relay_server_addr.do_send(Arc::new(OutgoingMessage::CancelOccurredMessage(CancelOccurredMessage{
                                 side: OrderType::Sell,

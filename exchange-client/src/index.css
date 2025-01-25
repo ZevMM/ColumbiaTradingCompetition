@@ -61,14 +61,14 @@ body {
 
 #glow {
   z-index: -1;
-  animation: pulse 60s infinite;
+  animation: pulse 50s infinite;
 }
 @keyframes pulse {
     0%, 100% {
-        box-shadow: 0 0 6px 6px rgba(111, 201, 242, 0.4), 0 0 10px 10px rgba(111, 201, 242, 0.36);
+        box-shadow: 0 0 5px 3px rgba(111, 201, 242, 0.4), 0 0 10px 10px rgba(111, 201, 242, 0.36);
     }
     50% {
-        box-shadow: 0 0 8px 8px rgba(211, 111, 242, 0.4), 0 0 12px 12px rgba(211, 111, 242, 0.36);
+        box-shadow: 0 0 8px 6px rgba(211, 111, 242, 0.4), 0 0 12px 12px rgba(211, 111, 242, 0.36);
     }
 }
 

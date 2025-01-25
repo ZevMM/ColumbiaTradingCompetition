@@ -18,6 +18,6 @@ const localIp = getLocalIp();
 
 const configFilePath = './src/local-ip.js';
 
-let fileContent = `const addr = \"ws://${localIp}:443/ws\"; export default addr`;
+let fileContent = `const addr = \"wss://${localIp}:443/ws\"; export default addr`;
 
 writeFileSync(configFilePath, fileContent, 'utf8');

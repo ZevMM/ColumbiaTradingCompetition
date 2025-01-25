@@ -28,6 +28,7 @@ env_logger = "0.10.0"
 pretty_env_logger = "0.4.0"
 log = "0.4.17"
 
+
 # Websockets dependencies
 actix = "0.13.0"
 actix-web-actors = "4.2.0"

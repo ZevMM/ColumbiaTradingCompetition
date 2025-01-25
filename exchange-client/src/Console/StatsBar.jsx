@@ -1,3 +1,5 @@
+import token from "../assets/Token.png"
+
 function StatsBar({account, game}) {
     let urpl = Object.entries(account.asset_balances).reduce(
         (s, [k,v], i) => {
@@ -12,7 +14,7 @@ function StatsBar({account, game}) {
                 <div style={{display:"flex", flexDirection:"row", justifyContent:"space-between", flex:1}}>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{}}>Cash</div>
-                        <div style={{fontSize:"26px", fontWeight:"bold"}}>${account.cents_balance}</div>
+                        <div style={{fontSize:"26px", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '22px'}}/>{account.cents_balance}</div>
                     </div>
                     {Object.entries(account.asset_balances).map(([k,v]) => {
                         return (
@@ -29,15 +31,15 @@ function StatsBar({account, game}) {
                 <div style={{display:"flex", flexDirection:"row", justifyContent:"space-between", flex:1}}>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{fontSize:"20px"}}>Unrealized P/L</div>
-                        <div style={{fontSize:"26px", fontWeight:"bold"}}>${urpl}</div>
+                        <div style={{fontSize:"26px", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '22px'}}/>{urpl}</div>
                     </div>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{fontSize:"20px"}}>Net Account Value</div>
-                        <div style={{fontSize:"26px", fontWeight:"bold"}}>${urpl + account.cents_balance}</div>
+                        <div style={{fontSize:"26px", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '22px'}}/>{urpl + account.cents_balance}</div>
                     </div>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{fontSize:"20px"}}>Available Margin</div>
-                        <div style={{fontSize:"26px", fontWeight:"bold"}}>${account.net_cents_balance}</div>
+                        <div style={{fontSize:"26px", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '22px'}}/>{account.net_cents_balance}</div>
                     </div>
                 </div>
             </div>

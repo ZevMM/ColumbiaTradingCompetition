@@ -180,8 +180,8 @@ macro_rules! init_accounts {
 
 generate_ticker_enum!([AD,TS,TT]);
 generate_account_balances_struct!([AD,TS,TT]);
-generate_global_state!([AD,TS,TT], [anniem2716,sethmend60,zem2109,Price_Enforcer]);
-generate_accounts_enum!([anniem2716,sethmend60,zem2109,Price_Enforcer]);
+generate_global_state!([AD,TS,TT], [Price_Enforcer,zev,zem2109]);
+generate_accounts_enum!([Price_Enforcer,zev,zem2109]);
 
 
 impl GlobalOrderBookState {
@@ -192,6 +192,6 @@ impl GlobalOrderBookState {
 
 impl GlobalAccountState {
         pub fn new() -> Self {
-            init_accounts!([(anniem2716,"kjUn"),(sethmend60,"ovsC"),(zem2109,"0000"),(Price_Enforcer,"penf")])
+            init_accounts!([(Price_Enforcer,"penf"),(zev,"0000"),(zem2109,"Cec7")])
         }
 }

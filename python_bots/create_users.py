@@ -5,6 +5,8 @@ from email.mime.text import MIMEText
 import random
 import string
 import json
+
+
 file = open("./sender_password")
 
 def generate_random_string(length: int) -> str:
@@ -14,8 +16,9 @@ def generate_random_string(length: int) -> str:
 
 sender_email = "zevmcmanusmendelowitz@gmail.com"
 sender_password = file.readline()
+max_price_cents = 100
 
-trader_emails = ['anniem2716@gmail.com', 'sethmend60@gmail.com', 'zem2109@columbia.edu']
+trader_emails = ["zem2109@columbia.edu"]
 server_addr = "ws://127.0.0.1:4000/orders/ws"
 
 smtp_server = "smtp.gmail.com"
@@ -27,7 +30,27 @@ message = MIMEMultipart()
 message["From"] = sender_email
 message["Subject"] = subject
 
-jsonout = []
+accounts = [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}]
+
+jsonout= { "max_price_cents": max_price_cents,
+        "assets": [
+        {
+            "symbol": "AD",
+            "long_name": "Average decible reading",
+            "max_price_cents": 50
+        },
+        {
+            "symbol": "TS",
+            "long_name": "Times Square Webcam Brightness",
+            "max_price_cents": 50
+        },
+        {
+            "symbol": "TT",
+            "long_name": "Average wait for 1 train at 116th (closest 8 times)",
+            "max_price_cents": 50
+        }
+    ],
+}
 
 with smtplib.SMTP(smtp_server, smtp_port) as server:
     server.starttls()
@@ -41,15 +64,18 @@ with smtplib.SMTP(smtp_server, smtp_port) as server:
         trader_id = ''.join(e if e.isalnum() else "_" for e in recipient_email.split("@")[0]) 
         password = generate_random_string(4)
         body = f'''
-        http://192.168.1.73:5173/ExchangeClient/ \n 
+        https://zevmm.github.io/ColumbiaTradingCompetition/ \n
+        https://drive.google.com/file/d/1xFue7NOyylHeSvFQFQteWvNKSYTOxxMa/view?usp=sharing \n 
         ================== \n
         Trader Id: {trader_id} \n
         Password: {password}
         '''
-        jsonout.append({"trader_id": trader_id, "password": password})
+        accounts.append({"trader_id": trader_id, "password": password})
         message.attach(MIMEText(body, "plain"))
 
         server.sendmail(sender_email, recipient_email, message.as_string())
         print(f"Email sent to {recipient_email}")
 
-print(json.dumps(jsonout))
+jsonout["accounts"] = accounts
+engine_conf = open("../matching-engine/config.json", "w")
+engine_conf.write(json.dumps(jsonout))

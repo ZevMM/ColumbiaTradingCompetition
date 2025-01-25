@@ -1,3 +1,5 @@
+import token from "../assets/Token.png"
+
 let placeOrder = (e, side, user, ws) => {
     e.preventDefault()
     const order = new FormData(e.target)
@@ -33,7 +35,7 @@ function OrderForm({ws, user, all_tickers}) {
         </div>
         
         <div style={{display:"flex",flexDirection:"column", width:"70%"}}>
-        <label htmlFor="price">Price</label>
+        <label htmlFor="price">Price (<img src={token} style={{width:"12px"}} />)</label>
         <input id="price" name="price" type="number" style={{width:"100%", boxSizing:"border-box"}} required/>
         </div>
 

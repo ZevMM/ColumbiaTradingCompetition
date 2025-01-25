@@ -126,12 +126,14 @@ function App() {
               let idx = newaccount.active_orders.findIndex(
                 (e) => e.order_id == body.order_id
               )
-              let {order_type, symbol, amount} = newaccount.active_orders[idx]
+              let {order_type, symbol, amount, price} = newaccount.active_orders[idx]
               if (order_type == "Buy") {
                 newaccount.net_cents_balance += price * amount
               } else {
                 newaccount.net_asset_balances[symbol] += amount
               }
+              console.log(newaccount.active_orders)
+              console.log(idx)
               newaccount.active_orders.splice(idx, 1)
               setAccount(newaccount)
               break; 

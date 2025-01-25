@@ -15,9 +15,9 @@ websocket_uri = "ws://127.0.0.1:4000/orders/ws"
 #{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
 settings = {
     #"JJs" : [None, 15, "flat", 400],
-    "TT" : ["TT_data", 15, "flat", 400],
-    "TS" : ["TS_data", 15, "flat", 400],
-    "AD" : ["AD_data", 15, "flat", 400],
+    "TT" : ["./data/TT_data", 15, "flat", 400],
+    "TS" : ["./data/TS_data", 15, "flat", 400],
+    "AD" : ["./data/AD_data", 15, "flat", 400],
 }
 
 def bot_lookup(name):

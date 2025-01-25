@@ -1,4 +1,5 @@
 import { useState } from "react"
+import token from "../assets/Token.png"
 
 function Portfolio({ws, account, user}) {
     //const [tab, setTab] = useState(1)
@@ -10,7 +11,7 @@ function Portfolio({ws, account, user}) {
             <thead>
             <tr style={{position: "sticky", top: 0, zIndex: 1, background:"rgb(0, 0, 225)"}}>
                 <th>Symbol</th>
-                <th>Price</th>
+                <th>Price (<img src={token} style={{width:"12px"}} />)</th>
                 <th>Volume</th>
                 <th>Side</th>
             </tr>

@@ -57,7 +57,7 @@ function Console({ws, user, game, account}) {
             <OrderBook buyside={cumsum_buy} sellside={cumsum_sell} lowsell={lowsell} lowbuy={lowbuy}/>
         </div>
 
-        <div id="glow" style={{position:"absolute", left:"30.5%", top:"11%", bottom:"1%", right:"1%"}}>
+        <div id="glow" style={{position:"absolute", left:"30.5%", top:"11%", bottom:"1%", right:"0.5%"}}>
         </div>
     </div>
   )
