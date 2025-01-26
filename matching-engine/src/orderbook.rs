@@ -385,10 +385,8 @@ fn add_order_to_book(
                             .remove(0);
                     } else {
                         let mut counter_party = accounts_data.index_ref(self.buy_side_limit_levels[current_price_level].orders[0].trader_id).lock().unwrap();
-                        debug!("{:?}",counter_party);
                         let to_reduce = counter_party.active_orders.iter_mut().find(|&&mut x| x.order_id == self.buy_side_limit_levels[current_price_level].orders[0].order_id);
                         to_reduce.unwrap().amount -= amount_to_be_traded;
-                        debug!("{:?}",counter_party);
                     }
 
                     // order_index += 1;
@@ -559,10 +557,8 @@ fn add_order_to_book(
                             .remove(0);
                     } else {
                         let mut counter_party = accounts_data.index_ref(self.sell_side_limit_levels[current_price_level].orders[0].trader_id).lock().unwrap();
-                        debug!("{:?}",counter_party);
                         let to_reduce = counter_party.active_orders.iter_mut().find(|&&mut x| x.order_id == self.sell_side_limit_levels[current_price_level].orders[0].order_id);
                         to_reduce.unwrap().amount -= amount_to_be_traded;
-                        debug!("{:?}",counter_party);
                     }
                     // order_index += 1;
                     // debug!("Sending LimLevUpdate");
@@ -673,7 +669,7 @@ fn add_order_to_book(
         
         self.price_history.push((time, fill_event.price.try_into().unwrap(), fill_event.amount.try_into().unwrap()));
 
-        if (buy_trader.lock().unwrap().trader_id != TraderId::Price_Enforcer){
+        if buy_trader.lock().unwrap().trader_id != TraderId::Price_Enforcer {
             *buy_trader
                 .lock()
                 .unwrap()

@@ -116,7 +116,7 @@ pub fn add_order<'a>(
             .index_ref(symbol)
             .lock()
             .unwrap()
-            + 1000 // allow 1000 shares
+            //+ 1000 allow 1000 shares
             < <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap())
             && order_request_inner.trader_id != TraderId::Price_Enforcer)
         {

@@ -41,7 +41,6 @@ function makeCandles(prices, idx, candles) {
   
 
 const PriceChart = ({game, cur_ticker}) => {
-  console.log("History: ", game[cur_ticker].price_history)
   const priceref = useRef([])
   const candles = useRef([])
   const c_idx = useRef(0)
@@ -57,7 +56,6 @@ const PriceChart = ({game, cur_ticker}) => {
     c_idx.current = makeCandles(priceref.current, 0, candles.current)
 
     const intervalId = setInterval(() => {
-      console.log("running interval")
       c_idx.current = makeCandles(priceref.current, c_idx.current, candles.current)
       setRevision(candles.current.length)
       console.log(candles.current.length)
