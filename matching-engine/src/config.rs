@@ -160,7 +160,7 @@ macro_rules! generate_global_state {
 macro_rules! init_orderbook {
 ([$($value:ident),+]) => {
     GlobalOrderBookState {
-        $($value: Mutex::new(quickstart_order_book(TickerSymbol::$value,0,50,10000)), )*
+        $($value: Mutex::new(quickstart_order_book(TickerSymbol::$value,0,100,10000)), )*
     }
     };
 }
@@ -180,8 +180,8 @@ macro_rules! init_accounts {
 
 generate_ticker_enum!([AD,TS,TT]);
 generate_account_balances_struct!([AD,TS,TT]);
-generate_global_state!([AD,TS,TT], [Price_Enforcer,zev,zem2109]);
-generate_accounts_enum!([Price_Enforcer,zev,zem2109]);
+generate_global_state!([AD,TS,TT], [Price_Enforcer,zev,ih2427]);
+generate_accounts_enum!([Price_Enforcer,zev,ih2427]);
 
 
 impl GlobalOrderBookState {
@@ -192,6 +192,6 @@ impl GlobalOrderBookState {
 
 impl GlobalAccountState {
         pub fn new() -> Self {
-            init_accounts!([(Price_Enforcer,"penf"),(zev,"0000"),(zem2109,"Cec7")])
+            init_accounts!([(Price_Enforcer,"penf"),(zev,"0000"),(ih2427,"F7gz")])
         }
 }

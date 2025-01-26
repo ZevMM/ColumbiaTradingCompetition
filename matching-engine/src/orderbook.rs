@@ -671,7 +671,7 @@ fn add_order_to_book(
         let cent_value = &fill_event.amount * &fill_event.price;
         let time = start_time.elapsed().unwrap().as_secs();
         
-        self.price_history.push((time, cent_value.try_into().unwrap(), fill_event.amount.try_into().unwrap()));
+        self.price_history.push((time, fill_event.price.try_into().unwrap(), fill_event.amount.try_into().unwrap()));
 
         if (buy_trader.lock().unwrap().trader_id != TraderId::Price_Enforcer){
             *buy_trader

@@ -41,6 +41,7 @@ function makeCandles(prices, idx, candles) {
   
 
 const PriceChart = ({game, cur_ticker}) => {
+  console.log("History: ", game[cur_ticker].price_history)
   const priceref = useRef([])
   const candles = useRef([])
   const c_idx = useRef(0)

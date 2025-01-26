@@ -15,5 +15,3 @@ $env:OPENSSL_CONF = "C:\Program Files\OpenSSL-Win64\bin\openssl.cfg"
 & "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" req -new -key server.key -out server.csr -config temp_server.conf
 
 & "C:\Program Files\OpenSSL-Win64\bin\openssl.exe" x509 -req -in server.csr -CA ca.crt -CAkey ca.key -out server.crt -days 365 -extensions v3_req -extfile temp_server.conf
-
-& ".\\nginx-1.27.3\nginx.exe"
