@@ -454,7 +454,7 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
     fn handle(&mut self, msg: Arc<OutgoingMessage>, ctx: &mut Self::Context) {
         // there has to be a nicer way to do this, but cant figure out how to access inner type when doing a default match
         // these messages are sent by Server detailed in connection_server.rs
-        ctx.text(serde_json::to_string(&msg).unwrap());
+        ctx.text(serde_json::to_string(&*msg).unwrap());
         // match *msg {
         //     OutgoingMessage::NewRestingOrderMessage(m) => {
         //         debug!("NewRestingOrderMessage Received");

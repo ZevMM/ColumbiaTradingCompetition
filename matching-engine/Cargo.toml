@@ -17,7 +17,6 @@ serde_json = {version = "1.0"}
 csv = "1.1"
 plotters = "0.3"
 serde = { version = "1", features = ["derive"]}
-openssl = { version = "0.10", features = ["vendored"] }
 
 
 # server dependencies
@@ -43,9 +42,6 @@ queues = "1.0.2"
 # sending fill messages between accounts.
 actix-broker = "0.4.3"
 
-# parser
-fefix = {version="0.7.0", features = ["fix42"]}
-prefix = "1.0.4"
 # macro help
 strum = "0.24.1"
 strum_macros = "0.24.3"

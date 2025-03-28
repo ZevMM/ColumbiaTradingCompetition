@@ -18,7 +18,7 @@ sender_email = "zevmcmanusmendelowitz@gmail.com"
 sender_password = file.readline()
 max_price_cents = 100
 
-trader_emails = ["ih2427@columbia.edu"]
+trader_emails = ["lmf2189@columbia.edu", "bs3612@columbia.edu","yl5212@columbia.edu"]
 server_addr = "ws://127.0.0.1:4000/orders/ws"
 
 smtp_server = "smtp.gmail.com"
