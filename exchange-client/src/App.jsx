@@ -117,13 +117,13 @@ function App() {
               }
               let {order_type, symbol, amount} = newaccount.active_orders[idx]
               if (order_type == "Buy") {
-                newaccount.cents_balance -= price * amount
-                newaccount.asset_balances[symbol] += amount
-                newaccount.net_asset_balances[symbol] += amount
+                newaccount.cents_balance -= price * amount_filled
+                newaccount.asset_balances[symbol] += amount_filled
+                newaccount.net_asset_balances[symbol] += amount_filled
               } else {
-                newaccount.cents_balance += price * amount
-                newaccount.net_cents_balance += price * amount
-                newaccount.asset_balances[symbol] -= amount
+                newaccount.cents_balance += price * amount_filled
+                newaccount.net_cents_balance += price * amount_filled
+                newaccount.asset_balances[symbol] -= amount_filled
               }
               if (amount == amount_filled) newaccount.active_orders.splice(idx, 1);
               else newaccount.active_orders[idx].amount -= amount_filled;
