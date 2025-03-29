@@ -1,1 +1,1 @@
-const addr = "wss://10.207.113.11:443/ws"; export default addr
+const addr = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"; export default addr

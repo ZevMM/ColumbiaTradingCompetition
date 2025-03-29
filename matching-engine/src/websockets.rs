@@ -26,7 +26,7 @@ use crate::api_messages::{
     OrderConfirmMessage, OrderFillMessage, OrderPlaceErrorMessage, OrderPlaceResponse,
     OrderRequest, OutgoingMessage, TradeOccurredMessage
 };
-use crate::message_types::{CloseMessage, OpenMessage};
+use crate::message_types::{CloseMessage, GameEndMessage, GameStartedMessage, OpenMessage};
 use crate::orderbook::{Fill, TraderId};
 use crate::websockets::ws::CloseCode::Policy;
 use crate::websockets::ws::CloseReason;
@@ -70,7 +70,7 @@ pub fn add_order<'a>(
     order_counter: &web::Data<Arc<AtomicUsize>>,
     start_time: &web::Data<SystemTime>
 ) -> OrderPlaceResponse<'a> {
-    debug!("Add Order Triggered!");
+    println!("Add Order Triggered!");
 
     let order_request_inner = order_request;
     let symbol = &order_request_inner.symbol;
@@ -120,7 +120,7 @@ pub fn add_order<'a>(
             < <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap())
             && order_request_inner.trader_id != TraderId::Price_Enforcer)
         {
-            debug!("Error: attempted short sell");
+            println!("Error: attempted short sell");
             return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage{
                 side: order_request_inner.order_type,
                 price: order_request_inner.price,
@@ -140,7 +140,7 @@ pub fn add_order<'a>(
         }
     };
 
-    debug!(
+    println!(
         "Account has {:?} lots of {:?}",
         &accounts_data
             .index_ref(order_request_inner.trader_id)
@@ -152,7 +152,7 @@ pub fn add_order<'a>(
             .unwrap(),
         symbol
     );
-    debug!(
+    println!(
         "Account has {:?} cents",
         &accounts_data
             .index_ref(order_request_inner.trader_id)
@@ -288,10 +288,26 @@ impl MyWebSocketActor {
                 ctx.stop();
                 return;
             }
-            //debug!("sent ping message");
+            //println!("sent ping message");
             ctx.ping(b"");
         });
     }
+}
+
+// Add this near your other handler functions
+pub async fn start_game(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
+    {
+        let mut game_started = global_state.game_started.lock().unwrap();
+        if *game_started {
+            return Ok(HttpResponse::BadRequest().body("Game has already started."));
+        }
+        *game_started = true;
+    }
+
+    // Notify all connected clients that the game has started
+    Broker::<SystemBroker>::issue_async(GameStartedMessage("GameStarted".to_string()));
+
+    Ok(HttpResponse::Ok().body("Game started successfully."))
 }
 
 pub async fn websocket(
@@ -306,9 +322,9 @@ pub async fn websocket(
 ) -> Result<HttpResponse, Error> {
     let conninfo = req.connection_info().clone();
 
-    log::debug!("{:?}", req.headers());
+    println!("{:?}", req.headers());
 
-    log::info!(
+    println!(
         "New websocket connection with peer_addr: {:?}, id: {:?}",
         conninfo.peer_addr(),
         req.headers()
@@ -381,12 +397,13 @@ impl Actor for MyWebSocketActor {
     // Start the heartbeat process for this connection
     fn started(&mut self, ctx: &mut Self::Context) {
         self.subscribe_system_async::<orderbook::OrderBook>(ctx);
+        self.subscribe_system_async::<GameStartedMessage>(ctx);
         // self.subscribe_system_async::<orderbook::LimLevUpdate>(ctx);
         self.relay_server_addr.do_send(OpenMessage {
             ip: self.connection_ip,
             addr: ctx.address().recipient(),
         });
-        debug!("Subscribed");
+        println!("Subscribed");
         self.hb(ctx);
     }
 
@@ -439,7 +456,7 @@ impl Handler<orderbook::OrderBook> for MyWebSocketActor {
     type Result = ();
 
     fn handle(&mut self, msg: orderbook::OrderBook, ctx: &mut Self::Context) {
-        debug!("Orderbook Message Received");
+        println!("Orderbook Message Received");
         // msg.print_book_state();
         ctx.text(format!("{:?}", &msg.get_book_state()));
     }
@@ -457,15 +474,15 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
         ctx.text(serde_json::to_string(&*msg).unwrap());
         // match *msg {
         //     OutgoingMessage::NewRestingOrderMessage(m) => {
-        //         debug!("NewRestingOrderMessage Received");
+        //         println!("NewRestingOrderMessage Received");
         //         ctx.text(serde_json::to_string(&msg).unwrap());
         //     }
         //     OutgoingMessage::TradeOccurredMessage(m) =>  {
-        //         debug!("TradeOccurredMessage Received");
+        //         println!("TradeOccurredMessage Received");
         //         ctx.text(serde_json::to_string(&m).unwrap());
         //     }
         //     OutgoingMessage::CancelOccurredMessage(m) => {
-        //         debug!("CancelOccurredMessage Received");
+        //         println!("CancelOccurredMessage Received");
         //         ctx.text(serde_json::to_string(&m).unwrap());
         //     },
         // }
@@ -476,7 +493,7 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
 //     type Result = ();
 
 //     fn handle(&mut self, msg: Arc<orderbook::LimLevUpdate>, ctx: &mut Self::Context) {
-//         // debug!("LimLevUpdate Message Received");
+//         // println!("LimLevUpdate Message Received");
 //         // msg.print_book_state()
 //         ctx.text(serde_json::to_string(&(*msg).clone()).unwrap());
 //     }
@@ -484,87 +501,25 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
 
 // The `StreamHandler` trait is used to handle the messages that are sent over the socket.
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor {
-    // started() function registers this with the trader account's actor addr
-    // and sends out all fill messages in the trader account's queue
-
-    fn finished(&mut self, ctx: &mut Self::Context) {
-        ctx.stop()
-    }
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        // Broker::<SystemBroker>::issue_async(self.global_state.global_orderbook_state);
-        let connection_ip = self.connection_ip;
-        let account_id = self.associated_id;
-
-        debug!("Trader with id {:?} connected.", account_id);
-        {
-            let curr_actor = &mut self
-                .global_state
-                .global_account_state
-                .index_ref(account_id)
-                .lock()
-                .unwrap()
-                .current_actor;
-
-            match curr_actor {
-                Some(x) => {
-                    if (connection_ip
-                        != env::var("GRAFANAIP")
-                            .expect("$GRAFANAIP is not set")
-                            .parse::<TraderIp>()
-                            .unwrap())
-                    {
-                        error!("Trader_id already has websocket connected");
-                        ctx.stop();
-                    }
-                }
-                None => *curr_actor = Some(ctx.address()),
-            }
-        }
-
-        let mut account = self
-            .global_state
-            .global_account_state
-            .index_ref(account_id)
-            .lock()
-            .unwrap();
-        // &* feels gross, not sure if there is a nicer/more performant solution
-        ctx.text(format!("{{\"AccountInfo\" : {}}}",serde_json::to_string(&*account).unwrap()));
-        ctx.text(format!("{{\"GameState\" : {}}}",serde_json::to_string(&self.global_state.global_orderbook_state).unwrap()));
-
-        let message_queue = &mut account.message_backup;
-        // Message queue should support OrderFillMessage, not TradeOccurredMessage or Fill
-        // to inform client side account state sync
-
-        while (message_queue.size() != 0) {
-            let order_fill_msg = message_queue.remove().unwrap();
-            let hack_msg = api_messages::OutgoingMessage::OrderFillMessage(*order_fill_msg);
-            ctx.text(serde_json::to_string(&hack_msg).unwrap());
-        }
-        
-    }
-    // finished() function removes the trader account's actor addr
-
-    // The `handle()` function is where we'll determine the response
-    // to the client's messages. So, for example, if we ping the client,
-    // it should respond with a pong. These two messages are necessary
-    // for the `hb()` function to maintain the connection status.
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        // if self.connection_ip != env::var("GRAFANAIP").expect("GRAFANAIP not set").parse::<TraderIp>().unwrap() {
-        let t_start = SystemTime::now();
-        self.t_orders += 1;
-        //debug!("total msgs received:{:?}", self.t_orders);
+        let game_started = *self.global_state.game_started.lock().unwrap();
 
+        // Handle messages as usual if the game has started
         match msg {
-            Ok(ws::Message::Text(msg)) => {
-                let t_start_o = SystemTime::now();
-                // handle incoming JSON as usual.
+            Ok(ws::Message::Text(text)) => {
+                if !game_started {
+                    // If the game hasn't started, reject actions but allow connections
+                    ctx.text(format!("{{MiscError : Game has not started yet.}}"));
+                    return;
+                }
 
-                // this is very expensive, should implement more rigid parsing.
-                // TODO: switch to handling in fix/binary instead of json to improve speed
-                info!("{}", &msg.to_string());
-                let incoming_message: IncomingMessage =
-                    serde_json::from_str(&msg.to_string()).unwrap();
+                let t_start = SystemTime::now();
+                self.t_orders += 1;
+                
+                // handle incoming JSON
+                info!("{}", &text.to_string());
+                let incoming_message: IncomingMessage = 
+                    serde_json::from_str(&text.to_string()).unwrap();
                 let connection_ip = self.connection_ip;
 
                 match incoming_message {
@@ -590,9 +545,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                                 &self.order_counter,
                                 &self.start_time
                             );
-
-                            let t_elp = t_start_o.elapsed().unwrap();
-                            debug!("secs for last order (inside match): {:?}", t_elp);
                             // elapsed is taking a non negligible time
                             let secs_elapsed = self
                                 .start_time
@@ -601,15 +553,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                                 .as_ref()
                                 .elapsed()
                                 .unwrap();
-                            debug!(
+                            println!(
                                 "time_elapsed from start: {:?}",
                                 usize::try_from(secs_elapsed.as_secs()).unwrap()
                             );
-                            debug!(
+                            println!(
                                 "total orders processed:{:?}",
                                 self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
                             );
-                            debug!(
+                            println!(
                                 "orders/sec: {:?}",
                                 self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
                                     / usize::try_from(secs_elapsed.as_secs()).unwrap()
@@ -617,9 +569,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
 
                             // println!("res: {}", res);
                             // let msg = self.global_state.global_orderbook_state.index_ref(&t.symbol).lock().unwrap().to_owned();
-                            // debug!("Issuing Async Msg");
+                            // println!("Issuing Async Msg");
                             // Broker::<SystemBroker>::issue_async(msg);
-                            // debug!("Issued Async Msg");
+                            // println!("Issued Async Msg");
                             // println!("{:?}", serde_json::to_string_pretty(&t));
 
                             // measured @~14microseconds.
@@ -660,9 +612,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                                 &self.relay_server_addr,
                                 &self.order_counter,
                             );
-
-                            let t_elp = t_start_o.elapsed().unwrap();
-                            debug!("secs for last order (inside match): {:?}", t_elp);
                             // elapsed is taking a non negligible time
                             let secs_elapsed = self
                                 .start_time
@@ -671,15 +620,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                                 .as_ref()
                                 .elapsed()
                                 .unwrap();
-                            debug!(
+                            println!(
                                 "time_elapsed from start: {:?}",
                                 usize::try_from(secs_elapsed.as_secs()).unwrap()
                             );
-                            debug!(
+                            println!(
                                 "total orders processed:{:?}",
                                 self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
                             );
-                            debug!(
+                            println!(
                                 "orders/sec: {:?}",
                                 self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
                                     / usize::try_from(secs_elapsed.as_secs()).unwrap()
@@ -707,7 +656,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                         };
                     }
                     IncomingMessage::AccountInfoRequest(account_info_request) => {
-                        debug!("Received AccountInfoRequest");
+                        println!("Received AccountInfoRequest");
                         let password_needed = self
                             .global_state
                             .global_account_state
@@ -748,7 +697,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
             }
             // Text will echo any text received back to the client (for now)
             // Ok(ws::Message::Text(text)) => ctx.text(text),
-            // Close will close the socket
             Ok(ws::Message::Close(reason)) => {
                 let account_id = self.associated_id;
                 self.global_state
@@ -767,7 +715,131 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                 ctx.stop();
             }
         }
-        let t_elp = t_start.elapsed().unwrap();
-        //debug!("secs for last request: {:?}", t_elp);
     }
+
+    fn finished(&mut self, ctx: &mut Self::Context) {
+        ctx.stop()
+    }
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        // Broker::<SystemBroker>::issue_async(self.global_state.global_orderbook_state);
+        let connection_ip = self.connection_ip;
+        let account_id = self.associated_id;
+
+        println!("Trader with id {:?} connected.", account_id);
+        {
+            let curr_actor = &mut self
+                .global_state
+                .global_account_state
+                .index_ref(account_id)
+                .lock()
+                .unwrap()
+                .current_actor;
+
+            match curr_actor {
+                Some(x) => {
+                    if (connection_ip
+                        != env::var("GRAFANAIP")
+                            .expect("$GRAFANAIP is not set")
+                            .parse::<TraderIp>()
+                            .unwrap())
+                    {
+                        error!("Trader_id already has websocket connected");
+                        ctx.stop();
+                    }
+                }
+                None => *curr_actor = Some(ctx.address()),
+            }
+        }
+
+        let mut account = self
+            .global_state
+            .global_account_state
+            .index_ref(account_id)
+            .lock()
+            .unwrap();
+        // &* feels gross, not sure if there is a nicer/more performant solution
+        ctx.text(format!("{{\"AccountInfo\" : {}}}",serde_json::to_string(&*account).unwrap()));
+        ctx.text(format!("{{\"GameState\" : {}}}",serde_json::to_string(&self.global_state.global_orderbook_state).unwrap()));
+        let game_started = *self.global_state.game_started.lock().unwrap();
+        if game_started {
+            ctx.text(format!("{{\"GameStartedMessage\" : \"GameStarted\"}}"));
+        }
+        let message_queue = &mut account.message_backup;
+        // Message queue should support OrderFillMessage, not TradeOccurredMessage or Fill
+        // to inform client side account state sync
+
+        while (message_queue.size() != 0) {
+            let order_fill_msg = message_queue.remove().unwrap();
+            let hack_msg = api_messages::OutgoingMessage::OrderFillMessage(*order_fill_msg);
+            ctx.text(serde_json::to_string(&hack_msg).unwrap());
+        }
+        
+    }
+
+}
+
+
+impl Handler<GameStartedMessage> for MyWebSocketActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: GameStartedMessage, ctx: &mut Self::Context) {
+        if msg.0 == "GameStarted" {
+            ctx.text(format!("{{\"GameStartedMessage\" : \"GameStarted\"}}"));
+        }
+    }
+}
+
+
+// Add this new handler
+impl Handler<GameEndMessage> for MyWebSocketActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: GameEndMessage, ctx: &mut Self::Context) {
+        ctx.text(format!("{{\"GameEndMessage\" : {}}}",serde_json::to_string(&msg.final_score).unwrap()));
+    }
+}
+
+
+pub async fn end_game(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
+    {
+        let mut game_started = global_state.game_started.lock().unwrap();
+        if !*game_started {
+            return Ok(HttpResponse::BadRequest().body("Game has not started yet."));
+        }
+        *game_started = false;
+    }
+
+    // Collect and sort final balances
+    let accounts = &global_state.global_account_state;
+    let mut final_standings: Vec<(TraderId, usize)> = Vec::new();
+    
+    // Collect balances for each trader
+    for trader_id in config::TraderId::iter() {
+        if trader_id != TraderId::Price_Enforcer {
+            let account = accounts.index_ref(trader_id).lock().unwrap();
+            final_standings.push((trader_id, account.cents_balance));
+        }
+    }
+
+    // Sort by balance in descending order
+    final_standings.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    // Print final standings
+    println!("Final Standings:");
+    for (rank, (trader_id, balance)) in final_standings.iter().enumerate() {
+        println!("Rank {}: Trader {:?} - Balance: {} cents", rank + 1, trader_id, balance);
+    }
+
+    for (trader_id, balance) in final_standings.iter() {
+        let end_message = GameEndMessage {
+            final_score: *balance,
+        };
+
+        if let Some(actor) = &accounts.index_ref(*trader_id).lock().unwrap().current_actor {
+            actor.do_send(end_message);
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(final_standings))
 }

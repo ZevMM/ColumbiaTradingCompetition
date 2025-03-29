@@ -3,7 +3,8 @@ import './App.css'
 import Login from './Login/Login'
 import Console from './Console/Console'
 import addr from './local-ip'
-
+import WaitScreen from './Views/WaitScreen'
+import EndScreen from './Views/EndScreen'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -11,8 +12,10 @@ function App() {
   const [ws, setWs] = useState(null)
   const [game, setGame] = useState(null)
   const [account, setAccount] = useState(null)
+  const [state, setState] = useState(0)
   const gameref = useRef(game)
   const accountref = useRef(account)
+  const [final_score, setFinalScore] = useState(0)
   
   //incase order fill comes before order confirm
   let tmp_fill = {}
@@ -26,6 +29,13 @@ function App() {
           console.log(e)
           let [type, body] = Object.entries(JSON.parse(e.data))[0]
           switch (type) {
+            case "GameStartedMessage":
+              setState(1)
+              break;
+            case "GameEndMessage":
+              setState(2)
+              setFinalScore(body)
+              break;
             case "GameState":
               setGame(body)
               break;
@@ -162,10 +172,15 @@ function App() {
 
     useEffect(() => {gameref.current = game}, [game])
     useEffect(() => {accountref.current = account}, [account])
-
-  if (ws) { return <Console ws={ws} user={user} game={game} account={account} /> }
+  
+  if (state == 2) {
+    return <EndScreen final_score={final_score} />
+  }
+  if (ws && state == 1) { return <Console ws={ws} user={user} game={game} account={account} /> }
+  if (ws && state == 0) {
+    return <WaitScreen />
+  }
   return <Login user={user} setUser={setUser} setWs={setWs} err={err} setErr={setErr}/>
-  //eventually add an end screen
 }
 
 export default App

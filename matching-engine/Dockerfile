@@ -1,35 +1,35 @@
 # Use the official Rust image as the base image
-FROM rust:1.72 AS builder
+FROM rust:latest AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the Cargo.toml and Cargo.lock files
-COPY Cargo.toml Cargo.lock ./
+# Copy the Cargo.toml, Cargo.lock, build.rs, and config.json files
+COPY Cargo.toml Cargo.lock build.rs config.json ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies
-RUN cargo build --release && rm -rf src
+RUN cargo build --release
 
-# Copy the source code
+# Copy the rest of the source code
 COPY . .
 
 # Build the application
 RUN cargo build --release
 
-# Use a minimal base image for the final container
-FROM debian:buster-slim
+# Use a minimal base image with a newer glibc version
+FROM debian:bookworm-slim
 
 # Set the working directory inside the container
 WORKDIR /app
 
 # Copy the compiled binary from the builder stage
-COPY --from=builder /app/target/release/matching-engine .
+COPY --from=builder /app/target/release/main .
 
 # Expose the port your server listens on
 EXPOSE 8080
 
 # Set the command to run the server
-CMD ["./matching-engine"]
+CMD ["./main"]

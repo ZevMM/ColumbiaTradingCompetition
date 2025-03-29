@@ -10,7 +10,7 @@ import random
 
 #move the normalization into this file (the running average/arctan/etc...)
 
-websocket_uri = "ws://127.0.0.1:4000/orders/ws"
+websocket_uri = "ws://localhost:8080/orders/ws"
 
 #{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
 settings = {
@@ -110,7 +110,8 @@ async def main():
         #seems like waiting for threads to finish blocks the ws from
         #responding to ping messages.
         while(1):
-            await ws.recv()
+            msg = await ws.recv()
+            print(msg)
 
 
 if __name__ == "__main__":
