@@ -25,8 +25,9 @@ FROM debian:bookworm-slim
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the compiled binary from the builder stage
+# Copy the compiled binary and config.json from the builder stage
 COPY --from=builder /app/target/release/main .
+COPY --from=builder /app/config.json .
 
 # Expose the port your server listens on
 EXPOSE 8080

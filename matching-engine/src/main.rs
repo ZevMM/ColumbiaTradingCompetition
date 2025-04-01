@@ -156,6 +156,8 @@ fn load_state(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    pretty_env_logger::init_timed();
+
     let start_time = web::Data::new(SystemTime::now());
     let order_counter = web::Data::new(Arc::new(AtomicUsize::new(0)));
     let relay_server = web::Data::new(connection_server::Server::new().start());
@@ -165,7 +167,6 @@ async fn main() -> std::io::Result<()> {
         game_started: Arc::new(Mutex::new(false)),
     });
 
-    pretty_env_logger::init();
     info!("Starting...");
     println!("Starting matching engine server...");
 

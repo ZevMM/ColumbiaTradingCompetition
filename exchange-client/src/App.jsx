@@ -2,9 +2,11 @@ import { useState, useEffect, useRef} from 'react'
 import './App.css'
 import Login from './Login/Login'
 import Console from './Console/Console'
-import addr from './local-ip'
 import WaitScreen from './Views/WaitScreen'
 import EndScreen from './Views/EndScreen'
+import ErrorPopup from './Error'
+
+const addr = "ws://localhost:8080/orders/ws"
 
 function App() {
   const [user, setUser] = useState(null)
@@ -22,7 +24,13 @@ function App() {
 
   useEffect(() => {
     if (user) {
-        let newws = new WebSocket(addr, [user.uid]);
+        let newws = new WebSocket(addr, [`${user.uid}|${user.pwd}`]);
+        newws.onerror = (error) => {
+          console.error("WebSocket error:", error);
+          setUser(null);
+          setWs(null);
+          setErr("Error connecting to server (check username and password)");
+        };
         newws.onopen = () => console.log("ws opened");
         newws.onclose = () => setWs(null);
         newws.onmessage = function(e) {
@@ -65,7 +73,7 @@ function App() {
                 setGame(newgame)
               break;
             case "OrderPlaceErrorMessage":
-              console.log("error: ", body)
+              setErr(body.error_details)
               break;
             case "OrderConfirmMessage": {
               body = body.order_info
@@ -149,7 +157,7 @@ function App() {
               break; 
             }
             case "CancelErrorMessage":
-              console.log("error: ", body)
+              setErr(body.error_details)
               break;
             case "CancelOccurredMessage": {
               let newgame = {...gameref.current}
@@ -173,14 +181,15 @@ function App() {
     useEffect(() => {gameref.current = game}, [game])
     useEffect(() => {accountref.current = account}, [account])
   
-  if (state == 2) {
-    return <EndScreen final_score={final_score} />
-  }
-  if (ws && state == 1) { return <Console ws={ws} user={user} game={game} account={account} /> }
-  if (ws && state == 0) {
-    return <WaitScreen />
-  }
-  return <Login user={user} setUser={setUser} setWs={setWs} err={err} setErr={setErr}/>
+  return (
+    <>
+      {err && <ErrorPopup message={err} clearError={() => setErr(null)} />}
+      {state === 2 && <EndScreen final_score={final_score} />}
+      {ws && state === 1 && <Console ws={ws} user={user} game={game} account={account} />}
+      {ws && state === 0 && <WaitScreen />}
+      {!ws && <Login user={user} setUser={setUser} setWs={setWs}/>}
+    </>
+  )
 }
 
 export default App

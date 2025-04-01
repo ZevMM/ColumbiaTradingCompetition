@@ -321,10 +321,10 @@ pub async fn websocket(
     order_counter: web::Data<Arc<AtomicUsize>>,
 ) -> Result<HttpResponse, Error> {
     let conninfo = req.connection_info().clone();
-
+    
     println!("{:?}", req.headers());
 
-    println!(
+    info!(
         "New websocket connection with peer_addr: {:?}, id: {:?}",
         conninfo.peer_addr(),
         req.headers()
@@ -334,10 +334,52 @@ pub async fn websocket(
             .unwrap()
     );
 
-    let sec_websocket_protocol = req.headers()
-    .get("Sec-WebSocket-Protocol")
-    .and_then(|h| h.to_str().ok())
-    .unwrap_or("");
+    let protocol = req.headers()
+        .get("Sec-WebSocket-Protocol")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| {
+            error!("Missing Sec-WebSocket-Protocol header");
+            Error::from(actix_web::error::ErrorBadRequest("Missing credentials"))
+        })?;
+
+    let creds: Vec<&str> = protocol.split('|').collect();
+    if creds.len() != 2 {
+        error!("Invalid credential format");
+        return Ok(HttpResponse::BadRequest().body("Invalid credential format"));
+    }
+
+    let username = creds[0];
+    let password = creds[1];
+
+    // Parse username into TraderId
+    let trader_id = match <TraderId as std::str::FromStr>::from_str(username) {
+        Ok(id) => id,
+        Err(_) => {
+            error!("Invalid trader ID: {}", username);
+            return Ok(HttpResponse::BadRequest().body("Invalid trader ID"));
+        }
+    };
+
+    // Validate credentials
+    let stored_password = state_data
+        .global_account_state
+        .index_ref(trader_id)
+        .lock()
+        .unwrap()
+        .password;
+
+    let password_chars: Vec<char> = password.chars().collect();
+    if password_chars.len() != 4 {
+        error!("Invalid password length for trader ID: {}. Expected 4 characters, got {}", 
+            username, password_chars.len());
+        return Ok(HttpResponse::BadRequest()
+            .body(format!("Invalid password length. Expected 4 characters, got {}", password_chars.len())));
+    }
+
+    if stored_password.to_vec() != password_chars {
+        error!("Invalid password for trader ID: {}", username);
+        return Ok(HttpResponse::Unauthorized().body("Invalid credentials"));
+    }
 
     ws::start_with_protocols(
     MyWebSocketActor {
@@ -347,7 +389,7 @@ pub async fn websocket(
             .unwrap()
             .parse()
             .unwrap(),
-        associated_id: <TraderId as std::str::FromStr>::from_str(sec_websocket_protocol).unwrap(),
+        associated_id: trader_id,
         hb: Instant::now(),
         global_state: state_data.clone(),
         start_time: start_time.clone(),
@@ -355,7 +397,7 @@ pub async fn websocket(
         relay_server_addr: relay_server_addr.clone(),
         order_counter: order_counter.clone(),
     },
-    &[sec_websocket_protocol],
+    &[protocol],
     &req,
     stream,
     )
@@ -518,8 +560,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                 
                 // handle incoming JSON
                 info!("{}", &text.to_string());
-                let incoming_message: IncomingMessage = 
-                    serde_json::from_str(&text.to_string()).unwrap();
+                
+                let incoming_message = match serde_json::from_str::<IncomingMessage>(&text.to_string()) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        error!("Failed to parse incoming message: {}", e);
+                        ctx.text(format!("{{\"error\": \"Invalid message format: {}\"}}", e));
+                        return;
+                    }
+                };
+
                 let connection_ip = self.connection_ip;
 
                 match incoming_message {

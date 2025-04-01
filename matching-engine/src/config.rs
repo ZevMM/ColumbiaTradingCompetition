@@ -180,8 +180,8 @@ macro_rules! init_accounts {
 
 generate_ticker_enum!([AD,TS,TT]);
 generate_account_balances_struct!([AD,TS,TT]);
-generate_global_state!([AD,TS,TT], [Price_Enforcer,zev,lmf2189,bs3612,yl5212]);
-generate_accounts_enum!([Price_Enforcer,zev,lmf2189,bs3612,yl5212]);
+generate_global_state!([AD,TS,TT], [Price_Enforcer,zev,TEST7,cu_b,cu_c,cu_d,cu_e,cu_f,cu_g,cu_h,cu_i,cu_j,cu_k,cu_l,cu_m,cu_n,cu_o,cu_p,cu_q,cu_r,cu_s]);
+generate_accounts_enum!([Price_Enforcer,zev,TEST7,cu_b,cu_c,cu_d,cu_e,cu_f,cu_g,cu_h,cu_i,cu_j,cu_k,cu_l,cu_m,cu_n,cu_o,cu_p,cu_q,cu_r,cu_s]);
 
 
 impl GlobalOrderBookState {
@@ -192,6 +192,6 @@ impl GlobalOrderBookState {
 
 impl GlobalAccountState {
         pub fn new() -> Self {
-            init_accounts!([(Price_Enforcer,"penf"),(zev,"0000"),(lmf2189,"GlfI"),(bs3612,"jFRW"),(yl5212,"Pr1G")])
+            init_accounts!([(Price_Enforcer,"penf"),(zev,"0000"),(TEST7,"0001"),(cu_b,"0002"),(cu_c,"0003"),(cu_d,"0004"),(cu_e,"0005"),(cu_f,"0006"),(cu_g,"0007"),(cu_h,"0008"),(cu_i,"0009"),(cu_j,"0010"),(cu_k,"0011"),(cu_l,"0012"),(cu_m,"0013"),(cu_n,"0014"),(cu_o,"0015"),(cu_p,"0016"),(cu_q,"0017"),(cu_r,"0018"),(cu_s,"0019")])
         }
 }

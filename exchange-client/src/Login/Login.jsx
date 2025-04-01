@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 
 
-function Login({user, setUser, err}) {
+function Login({user, setUser}) {
     if (user) {return <div>Loading...</div>}
     const [name, setName] = useState("")
     const [password, setPassword] = useState("")
@@ -19,7 +19,6 @@ function Login({user, setUser, err}) {
         <input style ={{margin:"5px", width:"15%", fontFamily:"IBM Plex Sans Condensed"}} value={password} onChange={(e) => setPassword(e.target.value)} placeholder='Password' required/>
         <input style ={{margin:"5px", width: "15%", background:"rgb(10, 10, 18)", border:"1px solid white", color: "white",
             fontFamily:"IBM Plex Sans Condensed"}} type="submit" value="Join"/>
-        {err}
         </form>
         
         </div>

@@ -10,7 +10,7 @@ import random
 
 #move the normalization into this file (the running average/arctan/etc...)
 
-websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
+websocket_uri = "ws://localhost:8080/orders/ws"
 
 #{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
 settings = {
