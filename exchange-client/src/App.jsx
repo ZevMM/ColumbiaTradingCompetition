@@ -36,6 +36,7 @@ function App() {
         newws.onmessage = function(e) {
           console.log(e)
           let [type, body] = Object.entries(JSON.parse(e.data))[0]
+          console.log(type, body);
           switch (type) {
             case "GameStartedMessage":
               setState(1)

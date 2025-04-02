@@ -1,66 +1,30 @@
 use actix::prelude::*;
-use actix_web::web::Bytes;
 use actix_web::Error;
 use actix_web_actors::ws;
 use log::info;
-use plotters::coord::types;
-use serde_json::json;
 use std::env;
-use std::f32::consts::E;
-use std::fmt::format;
-use std::net::Ipv4Addr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use uuid::serde;
 
-use strum::IntoEnumIterator; // 0.17.1
-use strum_macros::EnumIter; // 0.17.1
-
-use actix_broker::{ArbiterBroker, Broker, BrokerIssue, BrokerSubscribe, SystemBroker};
+use actix_broker::BrokerSubscribe;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(4);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 use crate::api_messages::{
     self, CancelConfirmMessage, CancelErrorMessage, CancelRequest, IncomingMessage,
-    OrderConfirmMessage, OrderFillMessage, OrderPlaceErrorMessage, OrderPlaceResponse,
-    OrderRequest, OutgoingMessage, TradeOccurredMessage
+    OrderConfirmMessage, OrderPlaceErrorMessage, OrderPlaceResponse,
+    OrderRequest, OutgoingMessage
 };
-use crate::message_types::{CloseMessage, GameEndMessage, GameStartedMessage, OpenMessage};
-use crate::orderbook::{Fill, TraderId};
-use crate::websockets::ws::CloseCode::Policy;
-use crate::websockets::ws::CloseReason;
-use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use std::sync::Mutex;
+use crate::message_types::{CloseMessage, GameStartedMessage, OpenMessage};
+use crate::orderbook::TraderId;
+use actix_web::{web, HttpRequest, HttpResponse};
 extern crate env_logger;
 
-use queues::IsQueue;
-
-use actix::prelude::*;
-
-use std::any::type_name;
-
-// mod orderbook;
-// mod accounts;
-// mod macro_calls;
-// mod websockets;
-
-pub use crate::accounts::TraderAccount;
-// pub use crate::orderbook::TickerSymbol;
-pub use crate::accounts::quickstart_trader_account;
 use crate::config::TraderIp;
-pub use crate::orderbook::quickstart_order_book;
-pub use crate::orderbook::OrderBook;
 pub use crate::orderbook::OrderType;
-use crate::{config, orderbook, GlobalState};
+use crate::GlobalState;
 
-use crate::config::AssetBalances;
-use crate::config::TickerSymbol;
-
-use crate::config::GlobalAccountState;
-use crate::config::GlobalOrderBookState;
-
-use ::serde::{de, Deserialize, Serialize};
 
 pub fn add_order<'a>(
     order_request: OrderRequest,
@@ -70,24 +34,77 @@ pub fn add_order<'a>(
     order_counter: &web::Data<Arc<AtomicUsize>>,
     start_time: &web::Data<SystemTime>
 ) -> OrderPlaceResponse<'a> {
-    println!("Add Order Triggered!");
 
     let order_request_inner = order_request;
     let symbol = &order_request_inner.symbol;
 
+    // Check active orders capacity
+    let trader_account = accounts_data
+    .index_ref(order_request_inner.trader_id)
+    .lock()
+    .unwrap();
+
+    if trader_account.active_orders.len() >= trader_account.active_orders.capacity() {
+        return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+            side: order_request_inner.order_type,
+            price: order_request_inner.price,
+            symbol: order_request_inner.symbol,
+            error_details: "Trader has reached maximum number of active orders"
+        });
+    }
+
+   // Check price level bounds
+   let orderbook = data.index_ref(&symbol).lock().unwrap();
+   let max_price = orderbook.buy_side_limit_levels.len();
+   if order_request_inner.price >= max_price {
+       return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+           side: order_request_inner.order_type,
+           price: order_request_inner.price,
+           symbol: order_request_inner.symbol,
+           error_details: "Price exceeds maximum allowed price"
+       });
+   }
+
+   if order_request_inner.amount > 10_000 {
+    return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+        side: order_request_inner.order_type,
+        price: order_request_inner.price,
+        symbol: order_request_inner.symbol,
+        error_details: "Volume exceeds maximum allowed single-order volume"
+    });
+   }
+
+   // Check limit level capacity based on order type
+   let level_orders = match order_request_inner.order_type {
+       OrderType::Buy => &orderbook.buy_side_limit_levels[order_request_inner.price].orders,
+       OrderType::Sell => &orderbook.sell_side_limit_levels[order_request_inner.price].orders,
+   };
+
+   // Compare against vector capacity
+   if level_orders.len() >= level_orders.capacity() {
+       return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+           side: order_request_inner.order_type,
+           price: order_request_inner.price,
+           symbol: order_request_inner.symbol,
+           error_details: "Price level is at capacity"
+       });
+   }
+
+   // Drop the orderbook lock before proceeding with existing logic
+   drop(orderbook);
+
+
+
     // Todo: refactor into match statement, put into actix guard?
-    if (order_request_inner.order_type == crate::orderbook::OrderType::Buy) {
-        // ISSUE: This should decrement cents_balance to avoid racing to place two orders before updating cents_balance
-        // check if current cash balance - outstanding orders supports order
-        // nevermind, as long as I acquire and hold a lock during the entire order placement attempt, it should be safe
+    if order_request_inner.order_type == crate::orderbook::OrderType::Buy {
         let cent_value = &order_request_inner.amount * &order_request_inner.price;
-        if ((accounts_data
+        if (accounts_data
             .index_ref(order_request_inner.trader_id)
             .lock()
             .unwrap()
             .net_cents_balance
             < cent_value)
-            && order_request_inner.trader_id != TraderId::Price_Enforcer)
+            && order_request_inner.trader_id != TraderId::Price_Enforcer
         {
             return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage{
                 side: order_request_inner.order_type,
@@ -96,7 +113,7 @@ pub fn add_order<'a>(
                 error_details: "Error Placing Order: The total value of order is greater than current account balance"
             });
         }
-        if (order_request_inner.trader_id != TraderId::Price_Enforcer) {
+        if order_request_inner.trader_id != TraderId::Price_Enforcer {
             accounts_data
                 .index_ref(order_request_inner.trader_id)
                 .lock()
@@ -104,11 +121,8 @@ pub fn add_order<'a>(
                 .net_cents_balance -= order_request_inner.price * order_request_inner.amount;
         }
     };
-    if (order_request_inner.order_type == crate::orderbook::OrderType::Sell) {
-        // ISSUE: This should decrement cents_balance to avoid racing to place two orders before updating cents_balance
-        // check if current cash balance - outstanding orders supports order
-        // nevermind, as long as I acquire and hold a lock during the entire order placement attempt, it should be safe
-        if ((*accounts_data
+    if order_request_inner.order_type == crate::orderbook::OrderType::Sell {
+        if (*accounts_data
             .index_ref(order_request_inner.trader_id)
             .lock()
             .unwrap()
@@ -116,19 +130,17 @@ pub fn add_order<'a>(
             .index_ref(symbol)
             .lock()
             .unwrap()
-            //+ 1000 allow 1000 shares
             < <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap())
-            && order_request_inner.trader_id != TraderId::Price_Enforcer)
+            && order_request_inner.trader_id != TraderId::Price_Enforcer
         {
-            println!("Error: attempted short sell");
             return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage{
                 side: order_request_inner.order_type,
                 price: order_request_inner.price,
                 symbol: order_request_inner.symbol,
-                error_details: "Error Placing Order: The total amount of this trade would take your account over 1000 shares short"
+                error_details: "Error Placing Order: The total amount of this trade would take your account short"
             });
         }
-        if (order_request_inner.trader_id != TraderId::Price_Enforcer) {
+        if order_request_inner.trader_id != TraderId::Price_Enforcer {
             *accounts_data
                 .index_ref(order_request_inner.trader_id)
                 .lock()
@@ -140,30 +152,6 @@ pub fn add_order<'a>(
         }
     };
 
-    println!(
-        "Account has {:?} lots of {:?}",
-        &accounts_data
-            .index_ref(order_request_inner.trader_id)
-            .lock()
-            .unwrap()
-            .asset_balances
-            .index_ref(symbol)
-            .lock()
-            .unwrap(),
-        symbol
-    );
-    println!(
-        "Account has {:?} cents",
-        &accounts_data
-            .index_ref(order_request_inner.trader_id)
-            .lock()
-            .unwrap()
-            .cents_balance
-    );
-
-    // let orderbook = data.index_ref(symbol);
-    // let jnj_orderbook = data.index_ref(&crate::macro_calls::TickerSymbol::JNJ);
-    // jnj_orderbook.lock().unwrap().print_book_state();
     // ISSUE: need to borrow accounts as mutable without knowing which ones will be needed to be borrowed
     // maybe pass in immutable reference to entire account state, and only acquire the locks for the mutex's that it turns out we need
 
@@ -190,7 +178,7 @@ pub fn add_order<'a>(
                 order_info: inner,
             })
         }
-        Err(err) => {
+        Err(_err) => {
             return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
                 side: order_request_inner.order_type,
                 price: order_request_inner.price,
@@ -271,11 +259,7 @@ pub struct MyWebSocketActor {
     associated_id: TraderId,
     hb: Instant,
     global_state: web::Data<GlobalState>,
-    // global_account_state: crate::config::GlobalAccountState,
-    // global_orderbook_state: crate::config::GlobalOrderBookState,
-    // for testing.
     start_time: web::Data<SystemTime>,
-    t_orders: usize,
     relay_server_addr: web::Data<Addr<crate::connection_server::Server>>,
     order_counter: web::Data<Arc<AtomicUsize>>,
 }
@@ -288,41 +272,20 @@ impl MyWebSocketActor {
                 ctx.stop();
                 return;
             }
-            //println!("sent ping message");
             ctx.ping(b"");
         });
     }
 }
 
-// Add this near your other handler functions
-pub async fn start_game(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
-    {
-        let mut game_started = global_state.game_started.lock().unwrap();
-        if *game_started {
-            return Ok(HttpResponse::BadRequest().body("Game has already started."));
-        }
-        *game_started = true;
-    }
-
-    // Notify all connected clients that the game has started
-    Broker::<SystemBroker>::issue_async(GameStartedMessage("GameStarted".to_string()));
-
-    Ok(HttpResponse::Ok().body("Game started successfully."))
-}
-
 pub async fn websocket(
     req: HttpRequest,
     stream: web::Payload,
-    // orderbook_data: crate::config::GlobalOrderBookState,
-    // accounts_data: crate::config::GlobalAccountState,
     state_data: web::Data<GlobalState>,
     start_time: web::Data<SystemTime>,
     relay_server_addr: web::Data<Addr<crate::connection_server::Server>>,
     order_counter: web::Data<Arc<AtomicUsize>>,
 ) -> Result<HttpResponse, Error> {
     let conninfo = req.connection_info().clone();
-    
-    println!("{:?}", req.headers());
 
     info!(
         "New websocket connection with peer_addr: {:?}, id: {:?}",
@@ -381,7 +344,7 @@ pub async fn websocket(
         return Ok(HttpResponse::Unauthorized().body("Invalid credentials"));
     }
 
-    ws::start_with_protocols(
+    ws::start(
     MyWebSocketActor {
         connection_ip: req
             .connection_info()
@@ -393,44 +356,12 @@ pub async fn websocket(
         hb: Instant::now(),
         global_state: state_data.clone(),
         start_time: start_time.clone(),
-        t_orders: 0,
         relay_server_addr: relay_server_addr.clone(),
         order_counter: order_counter.clone(),
     },
-    &[protocol],
     &req,
     stream,
     )
-/* 
-    ws::start(
-        MyWebSocketActor {
-            connection_ip: req
-                .connection_info()
-                .realip_remote_addr()
-                .unwrap()
-                .parse()
-                .unwrap(),
-            associated_id: <TraderId as std::str::FromStr>::from_str(
-                req.headers()
-                    .get("Sec-WebSocket-Protocol")
-                    .unwrap()
-                    .to_str()
-                    .unwrap(),
-            )
-            .unwrap(),
-            hb: Instant::now(),
-            global_state: state_data.clone(),
-            // global_account_state: accounts_data.clone(),
-            // global_orderbook_state: orderbook_data.clone(),
-            start_time: start_time.clone(),
-            t_orders: 0,
-            relay_server_addr: relay_server_addr.clone(),
-            order_counter: order_counter.clone(),
-        },
-        &req,
-        stream,
-    )
-*/
 }
 
 impl Actor for MyWebSocketActor {
@@ -438,14 +369,11 @@ impl Actor for MyWebSocketActor {
 
     // Start the heartbeat process for this connection
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.subscribe_system_async::<orderbook::OrderBook>(ctx);
         self.subscribe_system_async::<GameStartedMessage>(ctx);
-        // self.subscribe_system_async::<orderbook::LimLevUpdate>(ctx);
         self.relay_server_addr.do_send(OpenMessage {
             ip: self.connection_ip,
             addr: ctx.address().recipient(),
         });
-        println!("Subscribed");
         self.hb(ctx);
     }
 
@@ -473,11 +401,6 @@ impl Actor for MyWebSocketActor {
             "Websocket connection ended (peer_ip:{}).",
             self.connection_ip
         );
-        info!(
-            "curr_order_count {:?}",
-            self.order_counter
-                .load(std::sync::atomic::Ordering::Relaxed)
-        )
     }
 }
 
@@ -493,16 +416,6 @@ impl Handler<Arc<crate::api_messages::OrderFillMessage>> for MyWebSocketActor {
     }
 }
 
-/// Define handler for `OrderBookUpdate` message
-impl Handler<orderbook::OrderBook> for MyWebSocketActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: orderbook::OrderBook, ctx: &mut Self::Context) {
-        println!("Orderbook Message Received");
-        // msg.print_book_state();
-        ctx.text(format!("{:?}", &msg.get_book_state()));
-    }
-}
 
 // TODO: generalize to Handler<Arc<T>> for generic message types
 // Implement a marker trait (something like LOBChangeMessage)
@@ -514,32 +427,8 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
         // there has to be a nicer way to do this, but cant figure out how to access inner type when doing a default match
         // these messages are sent by Server detailed in connection_server.rs
         ctx.text(serde_json::to_string(&*msg).unwrap());
-        // match *msg {
-        //     OutgoingMessage::NewRestingOrderMessage(m) => {
-        //         println!("NewRestingOrderMessage Received");
-        //         ctx.text(serde_json::to_string(&msg).unwrap());
-        //     }
-        //     OutgoingMessage::TradeOccurredMessage(m) =>  {
-        //         println!("TradeOccurredMessage Received");
-        //         ctx.text(serde_json::to_string(&m).unwrap());
-        //     }
-        //     OutgoingMessage::CancelOccurredMessage(m) => {
-        //         println!("CancelOccurredMessage Received");
-        //         ctx.text(serde_json::to_string(&m).unwrap());
-        //     },
-        // }
     }
 }
-
-// impl Handler<Arc<orderbook::LimLevUpdate>> for MyWebSocketActor {
-//     type Result = ();
-
-//     fn handle(&mut self, msg: Arc<orderbook::LimLevUpdate>, ctx: &mut Self::Context) {
-//         // println!("LimLevUpdate Message Received");
-//         // msg.print_book_state()
-//         ctx.text(serde_json::to_string(&(*msg).clone()).unwrap());
-//     }
-// }
 
 // The `StreamHandler` trait is used to handle the messages that are sent over the socket.
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor {
@@ -551,21 +440,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
             Ok(ws::Message::Text(text)) => {
                 if !game_started {
                     // If the game hasn't started, reject actions but allow connections
-                    ctx.text(format!("{{MiscError : Game has not started yet.}}"));
+                    ctx.text("{{\"Error\" : \"Game has not started yet.\"}}");
                     return;
                 }
-
-                let t_start = SystemTime::now();
-                self.t_orders += 1;
-                
-                // handle incoming JSON
-                info!("{}", &text.to_string());
                 
                 let incoming_message = match serde_json::from_str::<IncomingMessage>(&text.to_string()) {
                     Ok(msg) => msg,
                     Err(e) => {
                         error!("Failed to parse incoming message: {}", e);
-                        ctx.text(format!("{{\"error\": \"Invalid message format: {}\"}}", e));
+                        ctx.text(format!("{{\"Error\": \"Invalid message format: {}\"}}", e));
                         return;
                     }
                 };
@@ -581,11 +464,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                             .lock()
                             .unwrap()
                             .password;
-                        if (password_needed != order_req.password) {
-                            // Should return a standardized error message for the client instead of text
+                        if password_needed != order_req.password {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
-                            // This should be a proper error
-                            ctx.text("invalid password for provided trader id.");
+
+                            ctx.text("{{\"Error\" : \"invalid password for provided trader id.\"}}");
                         } else {
                             let res = add_order(
                                 order_req,
@@ -595,47 +477,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                                 &self.order_counter,
                                 &self.start_time
                             );
-                            // elapsed is taking a non negligible time
-                            let secs_elapsed = self
-                                .start_time
-                                .clone()
-                                .into_inner()
-                                .as_ref()
-                                .elapsed()
-                                .unwrap();
-                            println!(
-                                "time_elapsed from start: {:?}",
-                                usize::try_from(secs_elapsed.as_secs()).unwrap()
-                            );
-                            println!(
-                                "total orders processed:{:?}",
-                                self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
-                            );
-                            println!(
-                                "orders/sec: {:?}",
-                                self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
-                                    / usize::try_from(secs_elapsed.as_secs()).unwrap()
-                            );
 
-                            // println!("res: {}", res);
-                            // let msg = self.global_state.global_orderbook_state.index_ref(&t.symbol).lock().unwrap().to_owned();
-                            // println!("Issuing Async Msg");
-                            // Broker::<SystemBroker>::issue_async(msg);
-                            // println!("Issued Async Msg");
-                            // println!("{:?}", serde_json::to_string_pretty(&t));
-
-                            // measured @~14microseconds.
-                            // for some reason goes up as more orders are added :(
                             match &res {
                                 OrderPlaceResponse::OrderPlaceErrorMessage(msg) => {
                                     ctx.text(serde_json::to_string(&res).unwrap());
                                 }
                                 OrderPlaceResponse::OrderConfirmMessage(msg) => {
-                                    // required for logging/state recovery in case of crashes
-                                    info!(
-                                        "ORDER DUMP: {}",
-                                        serde_json::to_string(&order_req).unwrap()
-                                    );
 
                                     ctx.text(serde_json::to_string(&res).unwrap());
                                 }
@@ -653,7 +500,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                         if (password_needed != cancel_req.password) {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
                             // This should be a proper error
-                            ctx.text("invalid password for provided trader id.");
+                            ctx.text("{{\"Error\" : \"invalid password for provided trader id.\"}}");
                         } else {
                             let res = cancel_order(
                                 cancel_req,
@@ -662,51 +509,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                                 &self.relay_server_addr,
                                 &self.order_counter,
                             );
-                            // elapsed is taking a non negligible time
-                            let secs_elapsed = self
-                                .start_time
-                                .clone()
-                                .into_inner()
-                                .as_ref()
-                                .elapsed()
-                                .unwrap();
-                            println!(
-                                "time_elapsed from start: {:?}",
-                                usize::try_from(secs_elapsed.as_secs()).unwrap()
-                            );
-                            println!(
-                                "total orders processed:{:?}",
-                                self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
-                            );
-                            println!(
-                                "orders/sec: {:?}",
-                                self.order_counter.load(std::sync::atomic::Ordering::SeqCst)
-                                    / usize::try_from(secs_elapsed.as_secs()).unwrap()
-                            );
-                            // need to match onto cancel response possibilities
 
-                            match &res {
-                                crate::api_messages::OrderCancelResponse::CancelConfirmMessage(
-                                    msg,
-                                ) => {
-                                    // required for logging/state recovery in case of crashes
-                                    info!(
-                                        "CANCEL DUMP: {}",
-                                        serde_json::to_string(&cancel_req).unwrap()
-                                    );
-
-                                    ctx.text(serde_json::to_string(&res).unwrap());
-                                }
-                                crate::api_messages::OrderCancelResponse::CancelErrorMessage(
-                                    msg,
-                                ) => {
-                                    ctx.text(serde_json::to_string(&res).unwrap());
-                                }
-                            }
+                            ctx.text(serde_json::to_string(&res).unwrap());
                         };
                     }
+
                     IncomingMessage::AccountInfoRequest(account_info_request) => {
-                        println!("Received AccountInfoRequest");
                         let password_needed = self
                             .global_state
                             .global_account_state
@@ -716,11 +524,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                             .password;
                         if (password_needed != account_info_request.password) {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
-                            // This should be a proper error
-                            ctx.text("invalid password for provided trader id.");
+                            ctx.text("{{\"Error\" : \"invalid password for provided trader id.\"}}");
                         } else {
-                            // should basically just send back serialized TraderAccount
-                            // need to attach all active order objects to TraderAccount in orderbook
                             let account = self
                                 .global_state
                                 .global_account_state
@@ -738,11 +543,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
             // Ping/Pong will be used to make sure the connection is still alive
             Ok(ws::Message::Ping(msg)) => {
                 self.hb = Instant::now();
-                //info!("Ping Received");
                 ctx.pong(&msg);
             }
             Ok(ws::Message::Pong(_)) => {
-                //info!("Pong Received");
                 self.hb = Instant::now();
             }
             // Text will echo any text received back to the client (for now)
@@ -815,81 +618,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
         if game_started {
             ctx.text(format!("{{\"GameStartedMessage\" : \"GameStarted\"}}"));
         }
-        let message_queue = &mut account.message_backup;
-        // Message queue should support OrderFillMessage, not TradeOccurredMessage or Fill
-        // to inform client side account state sync
-
-        while (message_queue.size() != 0) {
-            let order_fill_msg = message_queue.remove().unwrap();
-            let hack_msg = api_messages::OutgoingMessage::OrderFillMessage(*order_fill_msg);
-            ctx.text(serde_json::to_string(&hack_msg).unwrap());
-        }
         
     }
 
-}
-
-
-impl Handler<GameStartedMessage> for MyWebSocketActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: GameStartedMessage, ctx: &mut Self::Context) {
-        if msg.0 == "GameStarted" {
-            ctx.text(format!("{{\"GameStartedMessage\" : \"GameStarted\"}}"));
-        }
-    }
-}
-
-
-// Add this new handler
-impl Handler<GameEndMessage> for MyWebSocketActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: GameEndMessage, ctx: &mut Self::Context) {
-        ctx.text(format!("{{\"GameEndMessage\" : {}}}",serde_json::to_string(&msg.final_score).unwrap()));
-    }
-}
-
-
-pub async fn end_game(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
-    {
-        let mut game_started = global_state.game_started.lock().unwrap();
-        if !*game_started {
-            return Ok(HttpResponse::BadRequest().body("Game has not started yet."));
-        }
-        *game_started = false;
-    }
-
-    // Collect and sort final balances
-    let accounts = &global_state.global_account_state;
-    let mut final_standings: Vec<(TraderId, usize)> = Vec::new();
-    
-    // Collect balances for each trader
-    for trader_id in config::TraderId::iter() {
-        if trader_id != TraderId::Price_Enforcer {
-            let account = accounts.index_ref(trader_id).lock().unwrap();
-            final_standings.push((trader_id, account.cents_balance));
-        }
-    }
-
-    // Sort by balance in descending order
-    final_standings.sort_by(|a, b| b.1.cmp(&a.1));
-    
-    // Print final standings
-    println!("Final Standings:");
-    for (rank, (trader_id, balance)) in final_standings.iter().enumerate() {
-        println!("Rank {}: Trader {:?} - Balance: {} cents", rank + 1, trader_id, balance);
-    }
-
-    for (trader_id, balance) in final_standings.iter() {
-        let end_message = GameEndMessage {
-            final_score: *balance,
-        };
-
-        if let Some(actor) = &accounts.index_ref(*trader_id).lock().unwrap().current_actor {
-            actor.do_send(end_message);
-        }
-    }
-
-    Ok(HttpResponse::Ok().json(final_standings))
 }

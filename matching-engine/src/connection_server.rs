@@ -16,7 +16,6 @@ impl Server {
         warn!("Relay Server actor created");
         Server {
             // todo: capacity number should be abstracted to config file. 
-            
             connected_actors: Vec::with_capacity(1000)
         }
     }
@@ -26,36 +25,9 @@ impl Actor for Server {
     type Context = Context<Self>;
 }
 
-// need to impl all "OutgoingOrderMessage"
-// impl Handler<crate::orderbook::LimLevUpdate> for Server {
-//     // forward limit level updates to all connected actors
-//     type Result = ();
-//     fn handle(
-//         &mut self,
-//         msg: crate::orderbook::LimLevUpdate,
-//         ctx: &mut Self::Context,
-//     ) -> Self::Result {
-//         debug!("New LimLevUpdate Message Received by Relay Server");
-//         let msg_arc = Arc::new(msg);
-//         for connection in self.connected_actors.iter() {
-//             // connection.do_send(msg_arc.clone());
-//         }
-//     }
-// }
-
-
 impl Handler<Arc<OutgoingMessage>> for Server {
     type Result = ();
     fn handle(&mut self, msg: Arc<OutgoingMessage>, ctx: &mut Self::Context) {      
-        // there has to be a nicer way to do this, but cant figure out how to access inner type when doing a default match
-        // ctx.text(serde_json::to_string(&msg.d).unwrap());
-
-        // need to check that we are not sending out to trader which placed the order
-        // to avoid double counting, could match on address, but seems bad. 
-
-        // do not need to avoid double messages, just advise clients that they shouldn't update 
-        // their orderbook on personal trade messages (i.e. they can deal with this)
-
         match *msg {
             OutgoingMessage::NewRestingOrderMessage(m) => {
                 let msg_arc = Arc::new(OutgoingMessage::NewRestingOrderMessage(m));
@@ -89,8 +61,7 @@ impl Handler<crate::message_types::OpenMessage> for Server{
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let res = self.connected_actors.push(msg.addr);
-        debug!("New websocket actor registered!");
-        debug!("Full list: {:?}", &self.connected_actors);        
+        debug!("New websocket actor registered: {:?}", &msg.ip);       
         res
     }
 }
@@ -103,8 +74,7 @@ impl Handler<crate::message_types::CloseMessage> for Server{
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let res = self.connected_actors.retain(|x| x != &msg.addr);
-        debug!("Websocket actor disconnected!");
-        debug!("Full list: {:?}", &self.connected_actors);        
+        debug!("Websocket actor disconnected: {:?}", &msg.ip);        
         res
     }
 }

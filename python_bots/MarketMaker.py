@@ -100,7 +100,7 @@ async def price_bot(key, ws):
 
 
 async def main():
-    async with websockets.connect(websocket_uri, subprotocols=["Price_Enforcer"]) as ws:
+    async with websockets.connect(websocket_uri, subprotocols=["Price_Enforcer|penf"]) as ws:
         tasks = []
         
         for key in settings:

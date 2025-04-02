@@ -3,7 +3,7 @@ use actix::*;
 use serde::Serialize;
 use std::sync::Arc;
 
-use crate::{api_messages::OutgoingMessage, config::TraderIp, orderbook::{TraderId}};
+use crate::{api_messages::OutgoingMessage, config::TraderIp};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -19,8 +19,7 @@ pub struct CloseMessage{
     pub addr: Recipient<Arc<OutgoingMessage>>
 }
 
-
-
+//not technically internal, but shouldn't be exposed to general users
 #[derive(Message, Debug, Serialize, Clone)]
 #[rtype(result = "()")]
 pub struct GameStartedMessage(pub String);

@@ -18,7 +18,7 @@ use std::str::FromStr;
 
 macro_rules! generate_ticker_enum {
     ([$($name:ident),*]) => {
-        #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+        #[derive(Debug, Copy, Clone, Deserialize, Serialize, EnumIter)]
         pub enum TickerSymbol {
             $($name, )*
         }
@@ -60,7 +60,7 @@ macro_rules! generate_ticker_enum {
 
 macro_rules! generate_accounts_enum {
     ([$($name:ident),*]) => {
-        #[derive(Debug, Copy, Clone, Deserialize, Serialize, EnumIter, PartialEq)]
+        #[derive(Debug, Copy, Clone, Deserialize, Serialize, EnumIter, PartialEq, Eq, PartialOrd, Ord)]
         pub enum TraderId {
             $($name, )*
         }
@@ -171,7 +171,8 @@ macro_rules! init_accounts {
         $($username: Mutex::new(quickstart_trader_account(
             TraderId::$username,
             10000,
-            $password.chars().collect::<Vec<_>>().try_into().unwrap(),
+            100,
+            $password.chars().collect::<Vec<_>>().try_into().unwrap()
         )), )*
     }
     };
