@@ -10,6 +10,10 @@ import random
 
 #move the normalization into this file (the running average/arctan/etc...)
 
+# want to place a batch of orders every 45 seconds. 1, 2, 3, 4, 5, _, _, _, _, _, 11, 12, 13, 14, 15
+# This means ~60 orders per asset per round. 60 orders * 3 assets * 4500 potential profit = 810_000
+# 90 units per price point. i.e. sell 450, buy 450.
+
 websocket_uri = "ws://localhost:8080/orders/ws"
 
 #{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
@@ -102,7 +106,6 @@ async def price_bot(key, ws):
 async def main():
     async with websockets.connect(websocket_uri, subprotocols=["Price_Enforcer|penf"]) as ws:
         tasks = []
-        
         for key in settings:
             task = asyncio.create_task(price_bot(key, ws))
             tasks.append(task)

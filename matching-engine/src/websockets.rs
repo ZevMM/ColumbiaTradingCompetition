@@ -37,7 +37,7 @@ pub fn add_order<'a>(
 
     let order_request_inner = order_request;
     let symbol = &order_request_inner.symbol;
-
+    
     // Check active orders capacity
     let trader_account = accounts_data
     .index_ref(order_request_inner.trader_id)
@@ -52,6 +52,8 @@ pub fn add_order<'a>(
             error_details: "Trader has reached maximum number of active orders"
         });
     }
+
+    drop(trader_account);
 
    // Check price level bounds
    let orderbook = data.index_ref(&symbol).lock().unwrap();
@@ -92,7 +94,6 @@ pub fn add_order<'a>(
 
    // Drop the orderbook lock before proceeding with existing logic
    drop(orderbook);
-
 
 
     // Todo: refactor into match statement, put into actix guard?
@@ -154,7 +155,6 @@ pub fn add_order<'a>(
 
     // ISSUE: need to borrow accounts as mutable without knowing which ones will be needed to be borrowed
     // maybe pass in immutable reference to entire account state, and only acquire the locks for the mutex's that it turns out we need
-
     // Server Generated Order ID
     let order_id = order_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
@@ -433,12 +433,11 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
 // The `StreamHandler` trait is used to handle the messages that are sent over the socket.
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        let game_started = *self.global_state.game_started.lock().unwrap();
 
         // Handle messages as usual if the game has started
         match msg {
             Ok(ws::Message::Text(text)) => {
-                if !game_started {
+                if !*self.global_state.game_started.lock().unwrap() {
                     // If the game hasn't started, reject actions but allow connections
                     ctx.text("{{\"Error\" : \"Game has not started yet.\"}}");
                     return;

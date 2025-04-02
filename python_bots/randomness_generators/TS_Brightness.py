@@ -26,9 +26,16 @@ class TS:
         avg = calculate_average_pixel_value("timessquare.png")
         self.hist.append(avg)
         runavg = sum(self.hist) / len(self.hist)
-        return ((math.atan((avg - runavg) / 18) /  (math.pi)) + 0.5)*50
+        return ((math.atan((avg - runavg) / 18) /  (math.pi)) + 0.5)*86 + 8
 
-
+if __name__ == "__main__":
+    generator = TS()
+    f = open('TS_demo', 'w+')
+    for i in range(100):
+        f.write(str(generator.pull()) + "\n")
+        f.flush()
+        time.sleep(45)
+    f.close()
 
 
 

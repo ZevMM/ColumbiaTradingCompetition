@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use actix::Handler;
 use actix_broker::{Broker, SystemBroker};
 use actix_web::{web, HttpResponse};
@@ -34,19 +36,34 @@ pub async fn end_game(global_state: web::Data<GlobalState>) -> Result<HttpRespon
         *game_started = false;
     }
 
-    // Collect and sort final balances
-    let accounts = &global_state.global_account_state;
-    let mut final_standings: Vec<(TraderId, usize)> = Vec::new();
+    let orderbooks = &global_state.global_orderbook_state;
+    let mut final_prices = Vec::new();
     
-    // Collect balances for each trader
-    for trader_id in config::TraderId::iter() {
-        if trader_id != TraderId::Price_Enforcer {
-            let account = accounts.index_ref(trader_id).lock().unwrap();
-            final_standings.push((trader_id, account.cents_balance));
+    for symbol in config::TickerSymbol::iter() {
+        let orderbook = orderbooks.index_ref(&symbol).lock().unwrap();
+        if let Some(last_trade) = orderbook.price_history.last() {
+            final_prices.push((symbol, last_trade.1));
         }
     }
 
-    // Sort by balance in descending order
+    let accounts = &global_state.global_account_state;
+    let mut final_standings = Vec::new();
+
+    for trader_id in config::TraderId::iter() {
+        if trader_id != TraderId::Price_Enforcer {
+            let account = accounts.index_ref(trader_id).lock().unwrap();
+            let mut total_value = account.cents_balance;
+
+            for (symbol, price) in &final_prices {
+                let asset_balance = *account.asset_balances.index_ref(symbol).lock().unwrap();
+                let asset_value =  (*price as usize) * (100 * (asset_balance as usize)) / (100 + (asset_balance as usize));
+                total_value += asset_value;
+            }
+
+            final_standings.push((trader_id, total_value));
+        }
+    }
+
     final_standings.sort_by(|a, b| b.1.cmp(&a.1));
     
     // Print final standings

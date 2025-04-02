@@ -1,10 +1,11 @@
+import math
 import pyaudio
 import numpy as np
 import matplotlib.pyplot as plt
-import wave
 import audioop
 import threading
 import atexit
+import time
 
 CHUNK = 256
 FORMAT = pyaudio.paInt16
@@ -32,7 +33,7 @@ class AD:
             toreturn = round(np.mean(self.data),2)
             self.data.clear()
             self.hist.append(toreturn)
-            return toreturn
+            return ((math.atan((toreturn - np.mean(self.hist)) / 7) /  (math.pi)) + 0.5)*86 + 8
 
     def __start(self):
         while(True):
@@ -46,6 +47,16 @@ class AD:
         self.stream.close()
         self.p.terminate()
 
+
+if __name__ == "__main__":
+    generator = AD()
+    f = open('AD_demo', 'a+')
+    time.sleep(5)
+    for i in range(65):
+        f.write(str(generator.pull()) + "\n")
+        f.flush()
+        time.sleep(45)
+    f.close()
 
 
 #alldata = []

@@ -32,7 +32,7 @@ pub struct OrderBook {
     pub sell_side_limit_levels: Vec<LimitLevel>,
     current_high_buy_price: Price,
     current_low_sell_price: Price,
-    price_history: Vec<(u64, u16, u16)>,
+    pub price_history: Vec<(u64, u16, u16)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -480,22 +480,7 @@ fn add_order_to_book(
         
         self.price_history.push((time, fill_event.price.try_into().unwrap(), fill_event.amount.try_into().unwrap()));
 
-        // this prevents deadlocks
-        // e.g. one thread has account 1, wants 2 but another has 2 and wants 1
-        let (first_id, second_id) = if fill_event.buy_trader_id < fill_event.sell_trader_id {
-            (fill_event.buy_trader_id, fill_event.sell_trader_id)
-        } else {
-            (fill_event.sell_trader_id, fill_event.buy_trader_id)
-        };
-
-        let mut first_trader = accounts_data.index_ref(first_id).lock().unwrap();
-        let mut second_trader = accounts_data.index_ref(second_id).lock().unwrap();
-        
-        let (buy_trader, sell_trader) = if first_id == fill_event.buy_trader_id {
-            (&mut first_trader, &mut second_trader)
-        } else {
-            (&mut second_trader, &mut first_trader)
-        };
+        let mut buy_trader = accounts_data.index_ref(fill_event.buy_trader_id).lock().unwrap();
 
         if buy_trader.trader_id != TraderId::Price_Enforcer {
             *buy_trader
@@ -503,6 +488,11 @@ fn add_order_to_book(
                 .index_ref(&fill_event.symbol)
                 .lock()
                 .unwrap() += <usize as TryInto<i64>>::try_into(fill_event.amount).unwrap();
+            *buy_trader
+            .net_asset_balances
+            .index_ref(&fill_event.symbol)
+            .lock()
+            .unwrap() += <usize as TryInto<i64>>::try_into(fill_event.amount).unwrap();
             buy_trader.cents_balance -= cent_value;
         }
         
@@ -514,6 +504,10 @@ fn add_order_to_book(
 
         buy_trader.push_fill(buy_trader_order_fill_msg);
 
+        drop(buy_trader);
+
+        let mut sell_trader = accounts_data.index_ref(fill_event.sell_trader_id).lock().unwrap();
+
         // would need to iterate over all traders and clone once per.
         if sell_trader.trader_id != TraderId::Price_Enforcer {
             *sell_trader
@@ -521,6 +515,8 @@ fn add_order_to_book(
                 .index_ref(&fill_event.symbol)
                 .lock()
                 .unwrap() -= <usize as TryInto<i64>>::try_into(fill_event.amount).unwrap();
+
+
             sell_trader.cents_balance += cent_value;
             sell_trader.net_cents_balance += cent_value;
         }
