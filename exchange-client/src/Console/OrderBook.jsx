@@ -3,7 +3,7 @@ import token from "../assets/Token.png"
 function OrderBook({buyside, sellside, lowsell, lowbuy}) {
     return (
         <>
-            <div style={{height:"50%", display:"flex", flexDirection:"column-reverse", overflowY:"auto"}}>
+            <div style={{height:"48.5%", display:"flex", flexDirection:"column-reverse", overflowY:"auto"}}>
             <div>
                 {buyside
                     .map((l, i) => {return (
@@ -18,7 +18,7 @@ function OrderBook({buyside, sellside, lowsell, lowbuy}) {
             </div>
             </div>
 
-            <div className="ibm-plex-sans-bold" style={{width:"100%", display:"flex", flexDirection:"row"}}>
+            <div className="ibm-plex-sans-bold" style={{height:"3%", width:"100%", display:"flex", flexDirection:"row"}}>
                 
                 <div style={{flex:1}}>Price (<img src={token} style={{width:"12px"}}/>)</div>
                 
@@ -26,7 +26,7 @@ function OrderBook({buyside, sellside, lowsell, lowbuy}) {
                 
             </div>
             
-            <div style={{height:"50%", overflowY:"auto"}}>
+            <div style={{height:"48.5%", overflowY:"auto"}}>
                 {sellside
                     .map((l, i) => {return (
                     l > 0 ? 

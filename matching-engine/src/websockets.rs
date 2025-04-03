@@ -344,7 +344,7 @@ pub async fn websocket(
         return Ok(HttpResponse::Unauthorized().body("Invalid credentials"));
     }
 
-    ws::start(
+    ws::start_with_protocols(
     MyWebSocketActor {
         connection_ip: req
             .connection_info()
@@ -359,6 +359,7 @@ pub async fn websocket(
         relay_server_addr: relay_server_addr.clone(),
         order_counter: order_counter.clone(),
     },
+    &[protocol],
     &req,
     stream,
     )
@@ -433,7 +434,6 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
 // The `StreamHandler` trait is used to handle the messages that are sent over the socket.
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-
         // Handle messages as usual if the game has started
         match msg {
             Ok(ws::Message::Text(text)) => {
@@ -596,7 +596,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                             .parse::<TraderIp>()
                             .unwrap())
                     {
-                        error!("Trader_id already has websocket connected");
+                        println!("Trader_id already has websocket connected");
                         ctx.stop();
                     }
                 }
@@ -617,7 +617,5 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
         if game_started {
             ctx.text(format!("{{\"GameStartedMessage\" : \"GameStarted\"}}"));
         }
-        
     }
-
 }

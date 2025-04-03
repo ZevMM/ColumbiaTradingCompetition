@@ -68,7 +68,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(order_counter.clone())
             .route("/start_game", web::get().to(controls::start_game))
             .route("/end_game", web::get().to(controls::end_game))
-            .route("orders/ws", web::get().to(websockets::websocket))
+            .route("/orders/ws", web::get().to(websockets::websocket))
             .route("/market_data/ws", web::get().to(datastream::market_data_websocket))
     })
     .bind(("0.0.0.0", 8080))?

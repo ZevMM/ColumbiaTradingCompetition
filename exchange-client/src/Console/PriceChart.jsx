@@ -74,6 +74,7 @@ const PriceChart = ({game, cur_ticker}) => {
   const layout = {
     xaxis: {
       rangeslider: { visible: true },
+      range: intervals.length > 23 ? [intervals[intervals.length - 23], intervals[intervals.length - 23] + 24] : null,
     },
     yaxis: {
       title: 'Price',

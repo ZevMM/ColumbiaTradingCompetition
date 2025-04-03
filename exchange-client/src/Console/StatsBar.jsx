@@ -3,9 +3,10 @@ import token from "../assets/Token.png"
 function StatsBar({account, game}) {
     let urpl = Object.entries(account.asset_balances).reduce(
         (s, [k,v], i) => {
-            return (s + v * (game[k].price_history?.at(-1)?.[1] ?? 0))
+            return (s + (100 * v * (game[k].price_history?.at(-1)?.[1] ?? 0)) / (100 + v))
         }, 0
     )
+
 
     return (
         <div style={{display:"flex", width:"100%", flexDirection:"row", justifyContent:"space-around", color:"white"}}>
@@ -31,11 +32,11 @@ function StatsBar({account, game}) {
                 <div style={{display:"flex", flexDirection:"row", justifyContent:"space-between", flex:1}}>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Unrealized P/L</div>
-                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{urpl}</div>
+                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{urpl.toFixed(0)}</div>
                     </div>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Net Account Value</div>
-                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{urpl + account.cents_balance}</div>
+                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{(urpl + account.cents_balance).toFixed(0)}</div>
                     </div>
                     <div>
                         <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Available Margin</div>
