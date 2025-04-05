@@ -1,9 +1,9 @@
 import json
 import pandas as pd
 
-max_price_cents = 100
-start_cents_balance = 100000
-start_asset_balance = 100000
+max_price_cents = 101
+start_cents_balance = 10000
+start_asset_balance = 100
 
 accounts = [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}]
 
