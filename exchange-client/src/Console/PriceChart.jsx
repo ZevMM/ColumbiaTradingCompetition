@@ -64,7 +64,7 @@ const PriceChart = ({game, cur_ticker}) => {
     return () => clearInterval(intervalId);
   }, [cur_ticker]);
 
-  const intervals = candles.current.map((_, i) => i);
+  const intervals = candles.current.map((_, i) => i + 1);
   const open = candles.current.map(item => item.open);
   const high = candles.current.map(item => item.hi);
   const low = candles.current.map(item => item.lo);
@@ -74,7 +74,7 @@ const PriceChart = ({game, cur_ticker}) => {
   const layout = {
     xaxis: {
       rangeslider: { visible: true },
-      range: intervals.length > 23 ? [intervals[intervals.length - 23], intervals[intervals.length - 23] + 24] : null,
+      range: intervals.length > 22 ? [intervals[intervals.length - 22], intervals[intervals.length]] : [0, 22],
     },
     yaxis: {
       title: 'Price',

@@ -6,7 +6,7 @@ import WaitScreen from './Views/WaitScreen'
 import EndScreen from './Views/EndScreen'
 import ErrorPopup from './Error'
 
-const addr = "ws://localhost:8080/orders/ws"
+const addr = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
 
 function App() {
   const [user, setUser] = useState(null)
@@ -30,9 +30,15 @@ function App() {
           setUser(null);
           setWs(null);
           setErr("Error connecting to server (check username and password)");
+          setState(0);
         };
         newws.onopen = () => console.log("ws opened");
-        newws.onclose = () => setWs(null);
+        newws.onclose = () => {
+          setUser(null);
+          setWs(null);
+          setErr("Connection closed");
+          setState(0);
+        };
         newws.onmessage = function(e) {
           console.log(e)
           let [type, body] = Object.entries(JSON.parse(e.data))[0]
@@ -43,7 +49,15 @@ function App() {
               break;
             case "GameEndMessage":
               setState(2)
-              setFinalScore(body)
+
+              let urpl = Object.entries(accountref.current.asset_balances).reduce(
+                (s, [k,v], i) => {
+                    return (s + (100 * v * (gameref.current[k].price_history?.at(-1)?.[1] ?? 0)) / (100 + v))
+                }, 0
+              )
+              let net_value = urpl + accountref.current.cents_balance;
+
+              setFinalScore(net_value.toFixed(0));
               break;
             case "GameState":
               setGame(body)

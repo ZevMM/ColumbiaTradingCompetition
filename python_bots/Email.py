@@ -41,7 +41,7 @@ with smtplib.SMTP(smtp_server, smtp_port) as server:
         body = f'''
         Web Client: https://zevmm.github.io/ColumbiaTradingCompetition/ \n
         \n
-        Datastream: https://trading-competition-148005249496.us-central1.run.app/market_data/ws \n
+        Datastream: wss://trading-competition-148005249496.us-east4.run.app/market_data/ws \n
         ================== \n
         \n
         Trader Id: {trader_id} \n

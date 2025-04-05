@@ -25,6 +25,7 @@ fn main() {
     let assets_arr = value["assets"].as_array().unwrap();
     let accounts_arr = value["accounts"].as_array().unwrap();
     let start_asset_balance = value["start_asset_balance"].as_i64().unwrap();
+    let start_cents_balance = value["start_cents_balance"].as_i64().unwrap();
 
     let max_cents = value["max_price_cents"].as_i64().unwrap();
 
@@ -238,7 +239,7 @@ macro_rules! init_accounts {{
     GlobalAccountState {{
         $($username: Mutex::new(quickstart_trader_account(
             TraderId::$username,
-            10000,
+            {},
             {},
             $password.chars().collect::<Vec<_>>().try_into().unwrap()
         )), )*
@@ -265,7 +266,7 @@ impl GlobalAccountState {{
         }}
 }}
 ",
-        max_cents, start_asset_balance, symbols.trim(), symbols.trim(), symbols.trim(), account_ids.trim(),  account_ids.trim(),  symbols.trim(), accounts.trim()
+        max_cents, start_cents_balance, start_asset_balance, symbols.trim(), symbols.trim(), symbols.trim(), account_ids.trim(),  account_ids.trim(),  symbols.trim(), accounts.trim()
     );
     let bytes = Bytes::from(content.trim());
     f.write_all(&bytes).unwrap();

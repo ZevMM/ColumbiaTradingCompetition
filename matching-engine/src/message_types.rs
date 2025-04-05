@@ -28,6 +28,4 @@ pub struct GameStartedMessage(pub String);
 // Add this new message type
 #[derive(Message, Debug, Serialize, Clone)]
 #[rtype(result = "()")]
-pub struct GameEndMessage {
-    pub final_score: usize,
-}
+pub struct GameEndMessage;

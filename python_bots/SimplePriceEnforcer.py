@@ -6,7 +6,7 @@ import numpy as np
 import random
 import asyncio
 
-websocket_uri = "ws://localhost:8080/orders/ws"
+websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
 
 '''
 ("TT", "./data/TT_demo"),
@@ -109,6 +109,14 @@ async def price_bot(key, fname, ws, i):
 
 async def main():
     async with websockets.connect(websocket_uri, subprotocols=["Price_Enforcer|penf"]) as ws:
+        
+        while(1):
+            msg = await ws.recv()
+            msg = list(json.loads(msg).items())[0]
+            type, body = msg
+            if type == "GameStartedMessage":
+                break
+        
         tasks = []
         for i, (key, fname) in enumerate(assets):
             task = asyncio.create_task(price_bot(key, fname, ws, i))
@@ -116,17 +124,16 @@ async def main():
         
         #seems like waiting for threads to finish blocks the ws from
         #responding to ping messages.
-        cur = 0
-        first = True
-        while(1):
 
+        cur = 0
+        while(1):
             msg = await ws.recv()
+            print(msg)
             msg = list(json.loads(msg).items())[0]
             type, body = msg
+            if type == "GameEndMessage":
+                break
             if type == "AccountInfo":
-                if first:
-                    first = False
-                    continue
                 symbol = assets[cur][0]
                 print("Clearing orders for", symbol)
                 for order in body["active_orders"]:

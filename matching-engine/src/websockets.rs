@@ -439,7 +439,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
             Ok(ws::Message::Text(text)) => {
                 if !*self.global_state.game_started.lock().unwrap() {
                     // If the game hasn't started, reject actions but allow connections
-                    ctx.text("{{\"Error\" : \"Game has not started yet.\"}}");
+                    ctx.text("{\"Error\" : \"Game has not started yet.\"}");
                     return;
                 }
                 
@@ -466,7 +466,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                         if password_needed != order_req.password {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
 
-                            ctx.text("{{\"Error\" : \"invalid password for provided trader id.\"}}");
+                            ctx.text("{\"Error\" : \"invalid password for provided trader id.\"}");
                         } else {
                             let res = add_order(
                                 order_req,
@@ -499,7 +499,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                         if (password_needed != cancel_req.password) {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
                             // This should be a proper error
-                            ctx.text("{{\"Error\" : \"invalid password for provided trader id.\"}}");
+                            ctx.text("{\"Error\" : \"invalid password for provided trader id.\"}");
                         } else {
                             let res = cancel_order(
                                 cancel_req,
@@ -521,9 +521,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                             .lock()
                             .unwrap()
                             .password;
-                        if (password_needed != account_info_request.password) {
+                        if password_needed != account_info_request.password {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
-                            ctx.text("{{\"Error\" : \"invalid password for provided trader id.\"}}");
+                            ctx.text("{\"Error\" : \"invalid password for provided trader id.\"}");
                         } else {
                             let account = self
                                 .global_state
@@ -589,16 +589,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                 .current_actor;
 
             match curr_actor {
-                Some(x) => {
-                    if (connection_ip
-                        != env::var("GRAFANAIP")
-                            .expect("$GRAFANAIP is not set")
-                            .parse::<TraderIp>()
-                            .unwrap())
-                    {
-                        println!("Trader_id already has websocket connected");
-                        ctx.stop();
-                    }
+                Some(_) => {
+                    println!("Trader_id already has websocket connected");
+                    ctx.stop();
                 }
                 None => *curr_actor = Some(ctx.address()),
             }

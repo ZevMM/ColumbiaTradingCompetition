@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use actix::Handler;
 use actix_broker::{Broker, SystemBroker};
 use actix_web::{web, HttpResponse};
@@ -22,7 +20,7 @@ impl Handler<GameEndMessage> for MyWebSocketActor {
     type Result = ();
 
     fn handle(&mut self, msg: GameEndMessage, ctx: &mut Self::Context) {
-        ctx.text(format!("{{\"GameEndMessage\" : {}}}",serde_json::to_string(&msg.final_score).unwrap()));
+        ctx.text(format!("{{\"GameEndMessage\" : \"Game Over\"}}"));
     }
 }
 
@@ -35,6 +33,36 @@ pub async fn end_game(global_state: web::Data<GlobalState>) -> Result<HttpRespon
         }
         *game_started = false;
     }
+
+    let accounts = &global_state.global_account_state;
+
+    for trader_id in config::TraderId::iter() {
+        let end_message = GameEndMessage;
+
+        if let Some(actor) = &accounts.index_ref(trader_id).lock().unwrap().current_actor {
+            actor.do_send(end_message);
+        }
+    }
+
+    Ok(HttpResponse::Ok().body("Game ended successfully."))
+}
+
+pub async fn start_game(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
+    {
+        let mut game_started = global_state.game_started.lock().unwrap();
+        if *game_started {
+            return Ok(HttpResponse::BadRequest().body("Game has already started."));
+        }
+        *game_started = true;
+    }
+
+    // Notify all connected clients that the game has started
+    Broker::<SystemBroker>::issue_async(GameStartedMessage("GameStarted".to_string()));
+
+    Ok(HttpResponse::Ok().body("Game started successfully."))
+}
+
+pub async fn tally_score(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
 
     let orderbooks = &global_state.global_orderbook_state;
     let mut final_prices = Vec::new();
@@ -72,30 +100,5 @@ pub async fn end_game(global_state: web::Data<GlobalState>) -> Result<HttpRespon
         println!("Rank {}: Trader {:?} - Balance: {} cents", rank + 1, trader_id, balance);
     }
 
-    for (trader_id, balance) in final_standings.iter() {
-        let end_message = GameEndMessage {
-            final_score: *balance,
-        };
-
-        if let Some(actor) = &accounts.index_ref(*trader_id).lock().unwrap().current_actor {
-            actor.do_send(end_message);
-        }
-    }
-
     Ok(HttpResponse::Ok().json(final_standings))
-}
-
-pub async fn start_game(global_state: web::Data<GlobalState>) -> Result<HttpResponse, Error> {
-    {
-        let mut game_started = global_state.game_started.lock().unwrap();
-        if *game_started {
-            return Ok(HttpResponse::BadRequest().body("Game has already started."));
-        }
-        *game_started = true;
-    }
-
-    // Notify all connected clients that the game has started
-    Broker::<SystemBroker>::issue_async(GameStartedMessage("GameStarted".to_string()));
-
-    Ok(HttpResponse::Ok().body("Game started successfully."))
 }
