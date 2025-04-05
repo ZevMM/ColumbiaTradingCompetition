@@ -289,8 +289,10 @@ fn add_order_to_book(
                     }
 
                 }
-                // overflow issues
-                current_price_level -= 1;
+                current_price_level = match current_price_level.checked_sub(1) {
+                    Some(new_level) => new_level,
+                    None => break,
+                };
             }
             // To do: find a more elegant way to avoid "skipping" price levels on the way down.
             current_price_level += 1;

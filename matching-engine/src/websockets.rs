@@ -2,7 +2,6 @@ use actix::prelude::*;
 use actix_web::Error;
 use actix_web_actors::ws;
 use log::info;
-use std::env;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -297,13 +296,15 @@ pub async fn websocket(
             .unwrap()
     );
 
-    let protocol = req.headers()
+    let protocol = match req.headers()
         .get("Sec-WebSocket-Protocol")
-        .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| {
+        .and_then(|h| h.to_str().ok()) {
+        Some(protocol) => protocol,
+        None => {
             error!("Missing Sec-WebSocket-Protocol header");
-            Error::from(actix_web::error::ErrorBadRequest("Missing credentials"))
-        })?;
+            return Ok(HttpResponse::BadRequest().body("Missing credentials"));
+        }
+    };
 
     let creds: Vec<&str> = protocol.split('|').collect();
     if creds.len() != 2 {
@@ -344,6 +345,21 @@ pub async fn websocket(
         return Ok(HttpResponse::Unauthorized().body("Invalid credentials"));
     }
 
+    println!("Trader with id {:?} connected.", trader_id);
+    
+    let curr_actor = &mut state_data
+        .global_account_state
+        .index_ref(trader_id)
+        .lock()
+        .unwrap()
+        .current_actor;
+
+    if let Some(_) = curr_actor {
+        println!("Trader_id already has websocket connected");
+        return Ok(HttpResponse::Unauthorized().body("Invalid credentials"));
+    }
+    
+
     ws::start_with_protocols(
     MyWebSocketActor {
         connection_ip: req
@@ -380,24 +396,34 @@ impl Actor for MyWebSocketActor {
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
         let account_id = self.associated_id;
-        let curr_actor = &mut self
-            .global_state
-            .global_account_state
-            .index_ref(account_id)
-            .lock()
-            .unwrap()
-            .current_actor;
+        
         self.relay_server_addr.do_send(CloseMessage {
             ip: self.connection_ip,
             addr: ctx.address().recipient(),
         });
-
-        match curr_actor {
-            Some(x) => {
-                *curr_actor = None;
+        
+        match self
+            .global_state
+            .global_account_state
+            .index_ref(account_id)
+            .lock()
+        {
+            Ok(mut guard) => {
+                if guard.current_actor.is_some() {
+                    guard.current_actor = None;
+                    info!("Cleared current_actor for trader {:?}", account_id);
+                }
             }
-            None => warn!("curr_actor already None"),
+            Err(poisoned) => {
+                // Recover from poisoned mutex
+                let mut guard = poisoned.into_inner();
+                if guard.current_actor.is_some() {
+                    guard.current_actor = None;
+                    warn!("Recovered from poisoned mutex for trader {:?}", account_id);
+                }
+            }
         }
+
         info!(
             "Websocket connection ended (peer_ip:{}).",
             self.connection_ip
@@ -574,28 +600,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
     }
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // Broker::<SystemBroker>::issue_async(self.global_state.global_orderbook_state);
-        let connection_ip = self.connection_ip;
         let account_id = self.associated_id;
-
-        println!("Trader with id {:?} connected.", account_id);
-        {
-            let curr_actor = &mut self
-                .global_state
-                .global_account_state
-                .index_ref(account_id)
-                .lock()
-                .unwrap()
-                .current_actor;
-
-            match curr_actor {
-                Some(_) => {
-                    println!("Trader_id already has websocket connected");
-                    ctx.stop();
-                }
-                None => *curr_actor = Some(ctx.address()),
-            }
-        }
 
         let mut account = self
             .global_state
@@ -603,6 +608,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
             .index_ref(account_id)
             .lock()
             .unwrap();
+
+        account.current_actor = Some(ctx.address());
+
         // &* feels gross, not sure if there is a nicer/more performant solution
         ctx.text(format!("{{\"AccountInfo\" : {}}}",serde_json::to_string(&*account).unwrap()));
         ctx.text(format!("{{\"GameState\" : {}}}",serde_json::to_string(&self.global_state.global_orderbook_state).unwrap()));
