@@ -3,7 +3,7 @@ import websockets
 import json
 import asyncio
 
-websocket_uri = "ws://localhost:8080/orders/ws"
+websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
 
 '''
 ("TT", "./data/TT_demo"),

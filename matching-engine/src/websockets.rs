@@ -215,23 +215,27 @@ pub fn cancel_order<'a>(
             match inner.order_type {
                 OrderType::Buy => {
                     // increase available funds
-                    accounts_data
-                        .index_ref(inner.trader_id)
-                        .lock()
-                        .unwrap()
-                        .net_cents_balance += inner.amount * inner.price;
+                    if inner.trader_id != TraderId::Price_Enforcer {
+                        accounts_data
+                            .index_ref(inner.trader_id)
+                            .lock()
+                            .unwrap()
+                            .net_cents_balance += inner.amount * inner.price;
+                    }
                 }
                 OrderType::Sell => {
                     // increase available assets
                     // need to dereference because each asset balance is a separate mutex (should this be changed?)
-                    *accounts_data
-                        .index_ref(inner.trader_id)
-                        .lock()
-                        .unwrap()
-                        .net_asset_balances
-                        .index_ref(&inner.symbol)
-                        .lock()
-                        .unwrap() +=  <usize as TryInto<i64>>::try_into(inner.amount).unwrap()
+                    if inner.trader_id != TraderId::Price_Enforcer {
+                        *accounts_data
+                            .index_ref(inner.trader_id)
+                            .lock()
+                            .unwrap()
+                            .net_asset_balances
+                            .index_ref(&inner.symbol)
+                            .lock()
+                            .unwrap() +=  <usize as TryInto<i64>>::try_into(inner.amount).unwrap()
+                    }
                 }
             }
             return crate::api_messages::OrderCancelResponse::CancelConfirmMessage(
@@ -522,7 +526,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                             .lock()
                             .unwrap()
                             .password;
-                        if (password_needed != cancel_req.password) {
+                        if password_needed != cancel_req.password {
                             warn!("Invalid password for provided trader_id: {}", connection_ip);
                             // This should be a proper error
                             ctx.text("{\"Error\" : \"invalid password for provided trader id.\"}");

@@ -6,8 +6,8 @@ import numpy as np
 import random
 import asyncio
 
-#websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
-websocket_uri = "ws://localhost:8080/orders/ws"
+websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
+#websocket_uri = "ws://localhost:8080/orders/ws"
 '''
 ("TT", "./data/TT_demo"),
 ("TS", "./data/TS_demo"),

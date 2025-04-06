@@ -31,8 +31,8 @@ class TT:
 if __name__ == "__main__":
     generator = TT()
     time.sleep(5)
-    f = open('TT_demo', 'a+')
-    for i in range(65):
+    f = open('TT_round1', 'a+')
+    for i in range(70):
         f.write(str(generator.pull()) + "\n")
         f.flush()
         time.sleep(45)
