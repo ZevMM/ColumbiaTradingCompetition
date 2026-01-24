@@ -22,15 +22,19 @@ jsonout= { "max_price_cents": max_price_cents,
         }
     ],
 }
-
+'''
 df = pd.read_csv("emails.csv", header=None)
 for index, email in enumerate(df[0], start=1):
     
-    trader_id = ''.join(e if e.isalnum() else "_" for e in email.split("@")[0]) 
+    trader_id = ''.join(e if e.isalnum() else "_" for e in email.split("@")[0])
     password = str(index).zfill(4)
 
     accounts.append({"trader_id": trader_id, "password": password})
-
+'''
+for i in range(1, 101):
+    trader_id = f"trader{i}"
+    password = str(i).zfill(4)
+    accounts.append({"trader_id": trader_id, "password": password})
 
 jsonout["accounts"] = accounts
 engine_conf = open("../matching-engine/config.json", "w")

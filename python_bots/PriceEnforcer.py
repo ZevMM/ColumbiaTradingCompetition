@@ -8,9 +8,11 @@ import threading
 import time
 import random
 
-#move the normalization into this file (the running average/arctan/etc...)
+#DONT USE
 
-websocket_uri = "ws://127.0.0.1:4000/orders/ws"
+#move the normalization into this file (the running average/arctan/etc...)
+"""
+websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
 
 #{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
 settings = {
@@ -111,4 +113,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main())"""

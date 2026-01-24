@@ -1,5 +1,5 @@
-round1 = [["zev",15750],["zev_m",13750],["zevmcmanusmendelowitz",14750],["ih2427",14750]]
-round2 = [["zev",14750],["zev_m",14750],["zevmcmanusmendelowitz",14750],["ih2427",14750]]
+round1 = [["jinha_park",56449],["Rtk2128",45480],["yl5573",36397],["j_neishabouri",32269],["amg2466",28912],["lt2887",28252],["yl4196",27620],["flw2118",26269],["vr2546",25887],["Doh2105",25852],["fu2137",25830],["cwl2145",24705],["jyc2179",23069],["sos2124",22448],["mt3565",22040],["ah4302",21795],["Kf2792",21041],["lh3168",20355],["sh4493",17132], ["nas2226",16654],["dhruv_goyal",16646],["ks4194",16071],["cl4317",15773],["waj2117",11727],["jq2394",11088],["Mh4506",10892]]
+round2 = [["yl5573",48262],["ks4194",37839],["cl4317",34652],["flw2118",32174],["cwl2145",29355],["amg2466",28111],["nas2226",27986],["mt3565",27068],["lt2887",26350],["Mh4506",25649],["Doh2105",25170],["vr2546",25163],["j_neishabouri",24843],["Rtk2128",24280],["dhruv_goyal",23630],["lh3168",22040],["yl4196",19850],["sos2124",16672],["jq2394",16556],["fu2137",16334],["ah4302",16065],["sh4493",19484],["waj2117",15256],["jyc2179",12954],["jinha_park",6164]]
 
 final = {}
 
@@ -9,4 +9,5 @@ for id, score in round1:
 for id, score in round2:
     final[id] = final.get(id, 0) + 2 * score
 
-print(sorted(list(final.items()), key=lambda x: x[1], reverse=True))
+for l in (f"{i + 1}. {v[0]}  {v[1]}" for i, v in enumerate(sorted(list(final.items()), key=lambda x: x[1], reverse=True))):
+    print(l)

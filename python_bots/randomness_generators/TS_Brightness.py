@@ -2,9 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 import time
 from PIL import Image
-import matplotlib.pyplot as plt
 import math
-import random
 #import statistics
 
 def calculate_average_pixel_value(image_path):
@@ -30,7 +28,7 @@ class TS:
 
 if __name__ == "__main__":
     generator = TS()
-    f = open('TS_demo', 'w+')
+    f = open('TS_round1', 'w+')
     for i in range(100):
         f.write(str(generator.pull()) + "\n")
         f.flush()

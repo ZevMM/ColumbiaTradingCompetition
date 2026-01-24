@@ -20,9 +20,7 @@ function App() {
   }, [isRunning, isPaused, time]);
 
   const handleStart = () => {
-    const parsedTime = parseFloat(inputTime); // Parse input as a float for fractional minutes
-    if (!isNaN(parsedTime) && parsedTime > 0) {
-      setTime(Math.round(parsedTime * 60)); // Convert minutes to seconds
+    if (time > 0) {
       setIsRunning(true);
       setIsPaused(false); // Ensure the timer starts in an unpaused state
       sendHttpRequest("start_game"); // Send HTTP request on start
@@ -67,7 +65,17 @@ function App() {
             type="number"
             placeholder="Set time (minutes)"
             value={inputTime}
-            onChange={(e) => setInputTime(e.target.value)}
+            onChange={
+              (e) => {
+                setInputTime(e.target.value);
+                let parsedTime = parseFloat(e.target.value); // Parse input as a float for fractional minutes
+                if (!isNaN(parsedTime) && parsedTime > 0) {
+                  setTime(Math.round(parsedTime * 60));
+                } else if (e.target.value == "") {
+                  setTime(0);
+                }
+              }
+            }
             disabled={isRunning}
             style={{ padding: "10px", fontSize: "16px", marginRight: "10px" }}
           />

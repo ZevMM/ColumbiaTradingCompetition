@@ -6,9 +6,8 @@ import WaitScreen from './Views/WaitScreen'
 import EndScreen from './Views/EndScreen'
 import ErrorPopup from './Error'
 
-//const addr = "ws://localhost:8080/orders/ws"
-//const addr = "wss://trading-competition-148005249496.us-central1.run.app/orders/ws"
-const addr = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
+const addr = "ws://localhost:8080/orders/ws"
+//const addr = "wss://trading-competition-148005249496.us-east4.run.app/orders/ws"
 
 function App() {
   const [user, setUser] = useState(null)

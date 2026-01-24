@@ -16,7 +16,6 @@ class TT:
         myl = []
         times = self.driver.find_elements \
             (By.CLASS_NAME, value= "time")
-        print(times)
         for n in range(len(times)):
             myl.append(int("0" + "".join \
                 ([s for s in times[n].text if s.isdigit()])))
@@ -24,14 +23,14 @@ class TT:
         self.hist.append(avg)
         runavg = sum(self.hist) / len(self.hist)
         self.driver.refresh()
-        return (((math.atan((avg - runavg) / 5) /  (math.pi)) + 0.5)*86 + 8) 
+        return (((math.atan((avg - runavg) / 4) /  (math.pi)) + 0.5)*86 + 8) 
 
 
 
 if __name__ == "__main__":
     generator = TT()
     time.sleep(5)
-    f = open('TT_round1', 'a+')
+    f = open('TT_round2', 'w+')
     for i in range(70):
         f.write(str(generator.pull()) + "\n")
         f.flush()

@@ -11,7 +11,10 @@ function makeCandles(prices, idx, candles) {
   let open, hi, lo, close, volume;
   
   let end_time = Math.floor(prices.at(-1)[0] / 60);
-  let t = Math.floor(prices[idx][0] / 60)
+  let t = Math.floor(prices[idx][0] / 60) 
+  //good bc makes chart start at first trade
+  //rather than showing a bunch of dead time before the game starts
+  //(could also have changed start_time initialization point server side ofc)
 
   while (t < end_time) {
       //create tick for time period t

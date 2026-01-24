@@ -15,9 +15,9 @@ websocket_uri = "wss://trading-competition-148005249496.us-east4.run.app/orders/
 '''
 
 assets = [
-    ("AD", "./data/AD_demo"),
-    ("TT", "./data/TT_demo"),
-    ("TS", "./data/TS_demo"),
+    ("AD", "./data/AD_round2"),
+    ("TT", "./data/TT_round2"),
+    ("TS", "./data/TS_round1"),
 ]
 
 async def place_order(ws, price, symbol):
