@@ -1,0 +1,36 @@
+services:
+  matching-engine:
+    build: ./matching-engine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./matching-engine/config.json:/app/config.json:ro
+    environment:
+      - CONFIG_PATH=/app/config.json
+      - RUST_LOG=info
+
+  exchange-client:
+    build: ./exchange-client
+    ports:
+      - "5173:5173"
+    depends_on:
+      - matching-engine
+
+  timer:
+    build: ./timer
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_SERVER_URL=http://matching-engine:8080
+    depends_on:
+      - matching-engine
+
+  price-enforcer:
+    build: ./python_bots
+    environment:
+      - WS_URI=ws://matching-engine:8080/orders/ws
+    volumes:
+      - ./python_bots/data:/app/data:ro
+    depends_on:
+      - matching-engine
+    restart: on-failure

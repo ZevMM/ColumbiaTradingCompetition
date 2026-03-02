@@ -42,9 +42,11 @@ function App() {
     sendHttpRequest("end_game"); // Send HTTP request on clear
   };
 
+  const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
+
   const sendHttpRequest = async (action) => {
     try {
-      const response = await fetch(`https://trading-competition-148005249496.us-east4.run.app/${action}`);
+      const response = await fetch(`${serverUrl}/${action}`);
       if (!response.ok) {
         console.error("Failed to send HTTP request");
       }

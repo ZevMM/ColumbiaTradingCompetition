@@ -484,7 +484,7 @@ fn add_order_to_book(
 
         let mut buy_trader = accounts_data.index_ref(fill_event.buy_trader_id).lock().unwrap();
 
-        if buy_trader.trader_id != TraderId::Price_Enforcer {
+        if !buy_trader.trader_id.is_price_enforcer() {
             *buy_trader
                 .asset_balances
                 .index_ref(&fill_event.symbol)
@@ -511,7 +511,7 @@ fn add_order_to_book(
         let mut sell_trader = accounts_data.index_ref(fill_event.sell_trader_id).lock().unwrap();
 
         // would need to iterate over all traders and clone once per.
-        if sell_trader.trader_id != TraderId::Price_Enforcer {
+        if !sell_trader.trader_id.is_price_enforcer() {
             *sell_trader
                 .asset_balances
                 .index_ref(&fill_event.symbol)

@@ -1,9 +1,8 @@
 use actix::Handler;
 use actix_broker::{Broker, SystemBroker};
 use actix_web::{web, HttpResponse};
-use strum::IntoEnumIterator;
 use actix_web::Error;
-use crate::{config::{self, TraderId}, message_types::{GameEndMessage, GameStartedMessage}, websockets::MyWebSocketActor, GlobalState};
+use crate::{config, message_types::{GameEndMessage, GameStartedMessage}, websockets::MyWebSocketActor, GlobalState};
 
 impl Handler<GameStartedMessage> for MyWebSocketActor {
     type Result = ();
@@ -36,7 +35,7 @@ pub async fn end_game(global_state: web::Data<GlobalState>) -> Result<HttpRespon
 
     let accounts = &global_state.global_account_state;
 
-    for trader_id in config::TraderId::iter() {
+    for trader_id in config::TraderId::all() {
         let end_message = GameEndMessage;
 
         if let Some(actor) = &accounts.index_ref(trader_id).lock().unwrap().current_actor {
@@ -67,7 +66,7 @@ pub async fn tally_score(global_state: web::Data<GlobalState>) -> Result<HttpRes
     let orderbooks = &global_state.global_orderbook_state;
     let mut final_prices = Vec::new();
     
-    for symbol in config::TickerSymbol::iter() {
+    for symbol in config::TickerSymbol::all() {
         let orderbook = orderbooks.index_ref(&symbol).lock().unwrap();
         if let Some(last_trade) = orderbook.price_history.last() {
             final_prices.push((symbol, last_trade.1));
@@ -77,8 +76,8 @@ pub async fn tally_score(global_state: web::Data<GlobalState>) -> Result<HttpRes
     let accounts = &global_state.global_account_state;
     let mut final_standings = Vec::new();
 
-    for trader_id in config::TraderId::iter() {
-        if trader_id != TraderId::Price_Enforcer {
+    for trader_id in config::TraderId::all() {
+        if !trader_id.is_price_enforcer() {
             let account = accounts.index_ref(trader_id).lock().unwrap();
             let mut total_value = account.cents_balance;
 

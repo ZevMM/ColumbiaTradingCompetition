@@ -5,7 +5,6 @@ use actix::Addr;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
-use strum::IntoEnumIterator;
 
 
 pub type Password = [char; 4];
@@ -53,7 +52,7 @@ pub fn quickstart_trader_account(
     let net_asset_balances = config::AssetBalances::new();
 
     // making it just give the same number of shares for each asset cus I feel lazy
-    for symbol in config::TickerSymbol::iter() {
+    for symbol in config::TickerSymbol::all() {
         *asset_balances.index_ref(&symbol).lock().unwrap() = start_asset_balance;
         *net_asset_balances.index_ref(&symbol).lock().unwrap() = start_asset_balance;
     }

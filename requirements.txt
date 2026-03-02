@@ -1,0 +1,26 @@
+# ==============================================================================
+# matching-engine/misc_test/
+#   client_test.py, grafana_test.py, websocket_test.py, websocket_test_v2.py
+# ==============================================================================
+requests            # HTTP requests (client_test.py)
+websockets          # async WebSocket client (grafana_test.py, websocket_test_v2.py)
+websocket-client    # sync WebSocket client (websocket_test.py)
+schedule            # job scheduling (websocket_test.py)
+scipy               # interpolation via interp1d (websocket_test.py)
+
+# ==============================================================================
+# python_bots/
+#   Datagen.py, MarketMaker.py, PriceEnforcer.py, SimplePriceEnforcer.py,
+#   StreamPrint.py, chaos.py, Email.py, PopulateConfig.py, fakedata.py
+# ==============================================================================
+numpy               # numerical arrays (Datagen, MarketMaker, PriceEnforcer, SimplePriceEnforcer, fakedata)
+pandas              # dataframes (Email.py, PopulateConfig.py)
+matplotlib          # plotting (fakedata.py, data/viz.py)
+
+# ==============================================================================
+# python_bots/randomness_generators/
+#   Audio_RNG.py, JJs_Capacity.py, TS_Brightness.py, TrainTime_Avg.py
+# ==============================================================================
+PyAudio             # microphone audio capture (Audio_RNG.py)
+selenium            # browser automation for scraping (JJs_Capacity.py, TS_Brightness.py, TrainTime_Avg.py)
+Pillow              # image processing (JJs_Capacity.py, TS_Brightness.py, TrainTime_Avg.py)

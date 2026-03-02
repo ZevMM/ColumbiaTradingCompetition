@@ -1,198 +1,363 @@
-use std::collections::HashMap;
-use std::net::Ipv4Addr;
-pub type TraderIp = std::net::Ipv4Addr;
-use std::io;
-use actix::Addr;
-use crate::websockets::MyWebSocketActor;
-pub use crate::accounts::quickstart_trader_account;
-pub use crate::orderbook::quickstart_order_book;
-
-use strum_macros::EnumIter;
-use core::fmt::Debug;
-use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use std::sync::Mutex;
-use uuid::Uuid;
+use std::str::FromStr;
+use std::fmt;
+use std::fs::File;
+use std::io::BufReader;
+
+use serde::{Deserialize, Serialize, Deserializer, Serializer};
+
 use crate::accounts::TraderAccount;
 use crate::orderbook::OrderBook;
-use std::str::FromStr;
 
-macro_rules! generate_ticker_enum {
-    ([$($name:ident),*]) => {
-        #[derive(Debug, Copy, Clone, Deserialize, Serialize, EnumIter)]
-        pub enum TickerSymbol {
-            $($name, )*
-        }
-        impl TryFrom<&'static str> for TickerSymbol {
-            type Error = &'static str;
+pub type TraderIp = std::net::Ipv4Addr;
 
-            fn try_from(s: &'static str) -> Result<TickerSymbol, &'static str> {
-                match s {
-                    $(stringify!($name) => Ok(TickerSymbol::$name),)+
-                    _ => Err("Invalid String")
-                }
-            }
-        }
+// ---------------------------------------------------------------------------
+// Global config registry
+// ---------------------------------------------------------------------------
 
-        impl FromStr for TickerSymbol {
-            type Err = &'static str;
-        
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                match s {
-                    $(stringify!($name) => Ok(TickerSymbol::$name),)+
-                    _ => Err("Invalid String")
-                }
-            }
-        }
+static CONFIG: OnceLock<ExchangeConfig> = OnceLock::new();
 
-        impl TickerSymbol {
-            //type Err = &'static str;
-
-            pub fn as_bytes(&self) -> &[u8] {
-                match &self {
-                    $(TickerSymbol::$name => stringify!($name).as_bytes(),)+
-                    //_ => Err("Invalid String")
-                }
-            }
-        }
-        
-    };
+#[derive(Debug, Deserialize)]
+struct RawConfig {
+    max_price_cents: usize,
+    start_asset_balance: i64,
+    start_cents_balance: usize,
+    assets: Vec<RawAsset>,
+    accounts: Vec<RawAccount>,
 }
 
-macro_rules! generate_accounts_enum {
-    ([$($name:ident),*]) => {
-        #[derive(Debug, Copy, Clone, Deserialize, Serialize, EnumIter, PartialEq, Eq, PartialOrd, Ord)]
-        pub enum TraderId {
-            $($name, )*
-        }
-        impl TryFrom<&'static str> for TraderId {
-            type Error = &'static str;
-
-            fn try_from(s: &'static str) -> Result<TraderId, &'static str> {
-                match s {
-                    $(stringify!($name) => Ok(TraderId::$name),)+
-                    _ => Err("Invalid String")
-                }
-            }            
-        }    
-
-        impl FromStr for TraderId {
-            type Err = &'static str;
-        
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                match s {
-                    $(stringify!($name) => Ok(TraderId::$name),)+
-                    _ => Err("Invalid String")
-                }
-            }
-        }
-
-        impl TraderId {
-            //type Err = &'static str;
-
-            pub fn as_bytes(&self) -> &[u8] {
-                match &self {
-                    $(TraderId::$name => stringify!($name).as_bytes(),)+
-                    //_ => Err("Invalid String")
-                }
-            }
-        }   
-    };
+#[derive(Debug, Deserialize)]
+struct RawAsset {
+    symbol: String,
 }
 
-macro_rules! generate_account_balances_struct {
-    ([$($name:ident),*]) => {
-        #[derive(Debug, Serialize, Deserialize)]
-        pub struct AssetBalances {
-            $($name: Mutex<i64>, )*
-        }    
-
-        impl AssetBalances {
-            pub fn index_ref (&self, symbol:&TickerSymbol) -> &Mutex<i64>{
-                match symbol {
-                    $(TickerSymbol::$name => {&self.$name}, )*
-                }
-            }     
-            
-            pub fn new() -> Self {
-                Self { 
-                    $($name: Mutex::new(0), )*
-                 }
-            }
-               
-        }
-    };
+#[derive(Debug, Deserialize)]
+struct RawAccount {
+    trader_id: String,
+    password: String,
 }
 
-macro_rules! generate_global_state {
-    ([$($name:ident),*], [$($account_id:ident),*]) => {
-        #[derive(Debug, Serialize, Deserialize)]
-        pub struct GlobalOrderBookState {
-            $(pub $name: Mutex<crate::orderbook::OrderBook>, )*
-        }
-        
-        impl GlobalOrderBookState {
-            pub fn index_ref (&self, symbol:&TickerSymbol) -> &Mutex<crate::orderbook::OrderBook>{
-                match symbol {
-                    $(TickerSymbol::$name => {&self.$name}, )*
-                }
-            }
-
-        }
-        
-        #[derive(Debug, Serialize, Deserialize)]
-        pub struct GlobalAccountState {
-            $(pub $account_id: Mutex<crate::accounts::TraderAccount>, )*
-        }
-
-        impl GlobalAccountState {
-            pub fn index_ref (&self, account_id:crate::config::TraderId,) -> &Mutex<crate::accounts::TraderAccount>{
-                match account_id {
-                    $(TraderId::$account_id => {&self.$account_id}, )*
-                }
-            }       
-                    
-        }
-
-    };
-
+#[derive(Debug)]
+pub struct ExchangeConfig {
+    pub ticker_names: Vec<String>,
+    pub trader_names: Vec<String>,
+    pub trader_passwords: Vec<[char; 4]>,
+    pub start_cents_balance: usize,
+    pub start_asset_balance: i64,
+    pub max_price_cents: usize,
+    pub price_enforcer_id: TraderId,
 }
 
-macro_rules! init_orderbook {
-([$($value:ident),+]) => {
-    GlobalOrderBookState {
-        $($value: Mutex::new(quickstart_order_book(TickerSymbol::$value,0,101,10000)), )*
+pub fn init_config(path: &str) {
+    let file = File::open(path).expect("Failed to open config file");
+    let reader = BufReader::new(file);
+    let raw: RawConfig = serde_json::from_reader(reader).expect("Failed to parse config.json");
+
+    let ticker_names: Vec<String> = raw.assets.iter().map(|a| a.symbol.clone()).collect();
+    let trader_names: Vec<String> = raw.accounts.iter().map(|a| a.trader_id.clone()).collect();
+    let trader_passwords: Vec<[char; 4]> = raw
+        .accounts
+        .iter()
+        .map(|a| {
+            let chars: Vec<char> = a.password.chars().collect();
+            chars
+                .try_into()
+                .expect("Password must be exactly 4 characters")
+        })
+        .collect();
+
+    let price_enforcer_idx = trader_names
+        .iter()
+        .position(|n| n == "Price_Enforcer")
+        .expect("Config must contain a Price_Enforcer account");
+
+    let cfg = ExchangeConfig {
+        ticker_names,
+        trader_names,
+        trader_passwords,
+        start_cents_balance: raw.start_cents_balance,
+        start_asset_balance: raw.start_asset_balance,
+        max_price_cents: raw.max_price_cents,
+        price_enforcer_id: TraderId(price_enforcer_idx as u16),
+    };
+
+    CONFIG.set(cfg).expect("Config already initialised");
+}
+
+pub fn config() -> &'static ExchangeConfig {
+    CONFIG.get().expect("Config not initialised — call init_config() first")
+}
+
+// ---------------------------------------------------------------------------
+// TickerSymbol  –  u16 newtype
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TickerSymbol(pub u16);
+
+impl TickerSymbol {
+    pub fn name(&self) -> &'static str {
+        &config().ticker_names[self.0 as usize]
     }
-    };
-}
 
-macro_rules! init_accounts {
-([$(($username:ident, $password:expr)),*]) => {
-    GlobalAccountState {
-        $($username: Mutex::new(quickstart_trader_account(
-            TraderId::$username,
-            10000,
-            100,
-            $password.chars().collect::<Vec<_>>().try_into().unwrap()
-        )), )*
+    pub fn as_bytes(&self) -> &[u8] {
+        self.name().as_bytes()
     }
-    };
+
+    pub fn count() -> usize {
+        config().ticker_names.len()
+    }
+
+    pub fn all() -> Vec<TickerSymbol> {
+        (0..Self::count()).map(|i| TickerSymbol(i as u16)).collect()
+    }
 }
 
+impl FromStr for TickerSymbol {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        config()
+            .ticker_names
+            .iter()
+            .position(|n| n == s)
+            .map(|i| TickerSymbol(i as u16))
+            .ok_or("Invalid ticker symbol")
+    }
+}
 
-generate_ticker_enum!([AD,TS,TT]);
-generate_account_balances_struct!([AD,TS,TT]);
-generate_global_state!([AD,TS,TT], [Price_Enforcer,zev,test1,test2,test3,test4,test5,trader1,trader2,trader3,trader4,trader5,trader6,trader7,trader8,trader9,trader10,trader11,trader12,trader13,trader14,trader15,trader16,trader17,trader18,trader19,trader20,trader21,trader22,trader23,trader24,trader25,trader26,trader27,trader28,trader29,trader30,trader31,trader32,trader33,trader34,trader35,trader36,trader37,trader38,trader39,trader40,trader41,trader42,trader43,trader44,trader45,trader46,trader47,trader48,trader49,trader50,trader51,trader52,trader53,trader54,trader55,trader56,trader57,trader58,trader59,trader60,trader61,trader62,trader63,trader64,trader65,trader66,trader67,trader68,trader69,trader70,trader71,trader72,trader73,trader74,trader75,trader76,trader77,trader78,trader79,trader80,trader81,trader82,trader83,trader84,trader85,trader86,trader87,trader88,trader89,trader90,trader91,trader92,trader93,trader94,trader95,trader96,trader97,trader98,trader99,trader100]);
-generate_accounts_enum!([Price_Enforcer,zev,test1,test2,test3,test4,test5,trader1,trader2,trader3,trader4,trader5,trader6,trader7,trader8,trader9,trader10,trader11,trader12,trader13,trader14,trader15,trader16,trader17,trader18,trader19,trader20,trader21,trader22,trader23,trader24,trader25,trader26,trader27,trader28,trader29,trader30,trader31,trader32,trader33,trader34,trader35,trader36,trader37,trader38,trader39,trader40,trader41,trader42,trader43,trader44,trader45,trader46,trader47,trader48,trader49,trader50,trader51,trader52,trader53,trader54,trader55,trader56,trader57,trader58,trader59,trader60,trader61,trader62,trader63,trader64,trader65,trader66,trader67,trader68,trader69,trader70,trader71,trader72,trader73,trader74,trader75,trader76,trader77,trader78,trader79,trader80,trader81,trader82,trader83,trader84,trader85,trader86,trader87,trader88,trader89,trader90,trader91,trader92,trader93,trader94,trader95,trader96,trader97,trader98,trader99,trader100]);
+impl fmt::Display for TickerSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
 
+impl Serialize for TickerSymbol {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.name())
+    }
+}
+
+impl<'de> Deserialize<'de> for TickerSymbol {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        TickerSymbol::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TraderId  –  u16 newtype
+// ---------------------------------------------------------------------------
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TraderId(pub u16);
+
+impl TraderId {
+    pub fn name(&self) -> &'static str {
+        &config().trader_names[self.0 as usize]
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.name().as_bytes()
+    }
+
+    pub fn is_price_enforcer(&self) -> bool {
+        *self == config().price_enforcer_id
+    }
+
+    pub fn count() -> usize {
+        config().trader_names.len()
+    }
+
+    pub fn all() -> Vec<TraderId> {
+        (0..Self::count()).map(|i| TraderId(i as u16)).collect()
+    }
+}
+
+impl FromStr for TraderId {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        config()
+            .trader_names
+            .iter()
+            .position(|n| n == s)
+            .map(|i| TraderId(i as u16))
+            .ok_or("Invalid trader ID")
+    }
+}
+
+impl fmt::Debug for TraderId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+impl fmt::Display for TraderId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+impl Serialize for TraderId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.name())
+    }
+}
+
+impl<'de> Deserialize<'de> for TraderId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        TraderId::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AssetBalances  –  Vec<Mutex<i64>>
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub struct AssetBalances {
+    balances: Vec<Mutex<i64>>,
+}
+
+impl AssetBalances {
+    pub fn new() -> Self {
+        let n = TickerSymbol::count();
+        Self {
+            balances: (0..n).map(|_| Mutex::new(0)).collect(),
+        }
+    }
+
+    pub fn index_ref(&self, symbol: &TickerSymbol) -> &Mutex<i64> {
+        &self.balances[symbol.0 as usize]
+    }
+}
+
+impl Serialize for AssetBalances {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(self.balances.len()))?;
+        for (i, m) in self.balances.iter().enumerate() {
+            let sym = TickerSymbol(i as u16);
+            let val = *m.lock().unwrap();
+            map.serialize_entry(sym.name(), &val)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for AssetBalances {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let map: std::collections::HashMap<String, i64> =
+            std::collections::HashMap::deserialize(deserializer)?;
+        let n = TickerSymbol::count();
+        let balances: Vec<Mutex<i64>> = (0..n).map(|_| Mutex::new(0)).collect();
+        for (name, val) in map {
+            if let Ok(sym) = TickerSymbol::from_str(&name) {
+                *balances[sym.0 as usize].lock().unwrap() = val;
+            }
+        }
+        Ok(AssetBalances { balances })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GlobalOrderBookState  –  Vec<Mutex<OrderBook>>
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub struct GlobalOrderBookState {
+    books: Vec<Mutex<OrderBook>>,
+}
 
 impl GlobalOrderBookState {
-        pub fn new() -> Self {
-            init_orderbook!([AD,TS,TT])
+    pub fn new() -> Self {
+        let cfg = config();
+        let books = TickerSymbol::all()
+            .into_iter()
+            .map(|sym| {
+                Mutex::new(crate::orderbook::quickstart_order_book(
+                    sym,
+                    0,
+                    cfg.max_price_cents,
+                    10000,
+                ))
+            })
+            .collect();
+        Self { books }
+    }
+
+    pub fn index_ref(&self, symbol: &TickerSymbol) -> &Mutex<OrderBook> {
+        &self.books[symbol.0 as usize]
+    }
+}
+
+impl Serialize for GlobalOrderBookState {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(self.books.len()))?;
+        for (i, m) in self.books.iter().enumerate() {
+            let sym = TickerSymbol(i as u16);
+            let book = m.lock().unwrap();
+            map.serialize_entry(sym.name(), &*book)?;
         }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for GlobalOrderBookState {
+    fn deserialize<D: Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self::new())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GlobalAccountState  –  Vec<Mutex<TraderAccount>>
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub struct GlobalAccountState {
+    accounts: Vec<Mutex<TraderAccount>>,
 }
 
 impl GlobalAccountState {
-        pub fn new() -> Self {
-            init_accounts!([(Price_Enforcer,"penf"),(zev,"0000"),(test1,"00t1"),(test2,"00t2"),(test3,"00t3"),(test4,"00t4"),(test5,"00t5"),(trader1,"0001"),(trader2,"0002"),(trader3,"0003"),(trader4,"0004"),(trader5,"0005"),(trader6,"0006"),(trader7,"0007"),(trader8,"0008"),(trader9,"0009"),(trader10,"0010"),(trader11,"0011"),(trader12,"0012"),(trader13,"0013"),(trader14,"0014"),(trader15,"0015"),(trader16,"0016"),(trader17,"0017"),(trader18,"0018"),(trader19,"0019"),(trader20,"0020"),(trader21,"0021"),(trader22,"0022"),(trader23,"0023"),(trader24,"0024"),(trader25,"0025"),(trader26,"0026"),(trader27,"0027"),(trader28,"0028"),(trader29,"0029"),(trader30,"0030"),(trader31,"0031"),(trader32,"0032"),(trader33,"0033"),(trader34,"0034"),(trader35,"0035"),(trader36,"0036"),(trader37,"0037"),(trader38,"0038"),(trader39,"0039"),(trader40,"0040"),(trader41,"0041"),(trader42,"0042"),(trader43,"0043"),(trader44,"0044"),(trader45,"0045"),(trader46,"0046"),(trader47,"0047"),(trader48,"0048"),(trader49,"0049"),(trader50,"0050"),(trader51,"0051"),(trader52,"0052"),(trader53,"0053"),(trader54,"0054"),(trader55,"0055"),(trader56,"0056"),(trader57,"0057"),(trader58,"0058"),(trader59,"0059"),(trader60,"0060"),(trader61,"0061"),(trader62,"0062"),(trader63,"0063"),(trader64,"0064"),(trader65,"0065"),(trader66,"0066"),(trader67,"0067"),(trader68,"0068"),(trader69,"0069"),(trader70,"0070"),(trader71,"0071"),(trader72,"0072"),(trader73,"0073"),(trader74,"0074"),(trader75,"0075"),(trader76,"0076"),(trader77,"0077"),(trader78,"0078"),(trader79,"0079"),(trader80,"0080"),(trader81,"0081"),(trader82,"0082"),(trader83,"0083"),(trader84,"0084"),(trader85,"0085"),(trader86,"0086"),(trader87,"0087"),(trader88,"0088"),(trader89,"0089"),(trader90,"0090"),(trader91,"0091"),(trader92,"0092"),(trader93,"0093"),(trader94,"0094"),(trader95,"0095"),(trader96,"0096"),(trader97,"0097"),(trader98,"0098"),(trader99,"0099"),(trader100,"0100")])
+    pub fn new() -> Self {
+        let cfg = config();
+        let accounts = TraderId::all()
+            .into_iter()
+            .map(|id| {
+                let pw = cfg.trader_passwords[id.0 as usize];
+                Mutex::new(crate::accounts::quickstart_trader_account(
+                    id,
+                    cfg.start_cents_balance,
+                    cfg.start_asset_balance,
+                    pw,
+                ))
+            })
+            .collect();
+        Self { accounts }
+    }
+
+    pub fn index_ref(&self, account_id: TraderId) -> &Mutex<TraderAccount> {
+        &self.accounts[account_id.0 as usize]
+    }
+}
+
+impl Serialize for GlobalAccountState {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(self.accounts.len()))?;
+        for (i, m) in self.accounts.iter().enumerate() {
+            let id = TraderId(i as u16);
+            let acct = m.lock().unwrap();
+            map.serialize_entry(id.name(), &*acct)?;
         }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for GlobalAccountState {
+    fn deserialize<D: Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self::new())
+    }
 }
