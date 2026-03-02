@@ -75,6 +75,7 @@ async fn main() -> std::io::Result<()> {
             .route("/tally_score", web::get().to(controls::tally_score))
             .route("/orders/ws", web::get().to(websockets::websocket))
             .route("/market_data/ws", web::get().to(datastream::market_data_websocket))
+            .route("/health", web::get().to(|| async { actix_web::HttpResponse::Ok().finish() }))
     })
     .bind(("0.0.0.0", 8080))?
     .run()

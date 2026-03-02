@@ -16,11 +16,16 @@ RUN cargo build --release
 # Copy the rest of the source code
 COPY . .
 
+# Touch main.rs to invalidate cargo's cached dummy build
+RUN touch src/main.rs
+
 # Build the application
 RUN cargo build --release
 
 # Use a minimal base image with a newer glibc version
 FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container
 WORKDIR /app

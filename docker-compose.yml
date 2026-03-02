@@ -8,6 +8,12 @@ services:
     environment:
       - CONFIG_PATH=/app/config.json
       - RUST_LOG=info
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
 
   exchange-client:
     build: ./exchange-client
@@ -32,5 +38,6 @@ services:
     volumes:
       - ./python_bots/data:/app/data:ro
     depends_on:
-      - matching-engine
+      matching-engine:
+        condition: service_healthy
     restart: on-failure
