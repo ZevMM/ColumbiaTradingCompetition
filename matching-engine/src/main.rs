@@ -48,6 +48,10 @@ struct GlobalState {
 async fn main() -> std::io::Result<()> {
     pretty_env_logger::init_timed();
 
+    let config_path = std::env::var("CONFIG_PATH").unwrap_or_else(|_| "config.json".to_string());
+    config::init_config(&config_path);
+    println!("Loaded config from {}", config_path);
+
     let start_time = web::Data::new(SystemTime::now());
     let order_counter = web::Data::new(Arc::new(AtomicUsize::new(0)));
     let relay_server = web::Data::new(connection_server::Server::new().start());
@@ -71,6 +75,7 @@ async fn main() -> std::io::Result<()> {
             .route("/tally_score", web::get().to(controls::tally_score))
             .route("/orders/ws", web::get().to(websockets::websocket))
             .route("/market_data/ws", web::get().to(datastream::market_data_websocket))
+            .route("/health", web::get().to(|| async { actix_web::HttpResponse::Ok().finish() }))
     })
     .bind(("0.0.0.0", 8080))?
     .run()

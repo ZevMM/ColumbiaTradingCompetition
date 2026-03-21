@@ -14,7 +14,7 @@ import random
 # This means ~60 orders per asset per round. 60 orders * 3 assets * 4500 potential profit = 810_000
 # 90 units per price point. i.e. sell 450, buy 450.
 
-websocket_uri = "ws://localhost:8080/orders/ws"
+websocket_uri = os.environ.get("WS_URI", "ws://localhost:8080/orders/ws")
 
 #{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
 settings = {

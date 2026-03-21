@@ -104,7 +104,7 @@ pub fn add_order<'a>(
             .unwrap()
             .net_cents_balance
             < cent_value)
-            && order_request_inner.trader_id != TraderId::Price_Enforcer
+            && !order_request_inner.trader_id.is_price_enforcer()
         {
             return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage{
                 side: order_request_inner.order_type,
@@ -113,7 +113,7 @@ pub fn add_order<'a>(
                 error_details: "Error Placing Order: The total value of order is greater than current account balance"
             });
         }
-        if order_request_inner.trader_id != TraderId::Price_Enforcer {
+        if !order_request_inner.trader_id.is_price_enforcer() {
             accounts_data
                 .index_ref(order_request_inner.trader_id)
                 .lock()
@@ -131,7 +131,7 @@ pub fn add_order<'a>(
             .lock()
             .unwrap()
             < <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap())
-            && order_request_inner.trader_id != TraderId::Price_Enforcer
+            && !order_request_inner.trader_id.is_price_enforcer()
         {
             return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage{
                 side: order_request_inner.order_type,
@@ -140,7 +140,7 @@ pub fn add_order<'a>(
                 error_details: "Error Placing Order: The total amount of this trade would take your account short"
             });
         }
-        if order_request_inner.trader_id != TraderId::Price_Enforcer {
+        if !order_request_inner.trader_id.is_price_enforcer() {
             *accounts_data
                 .index_ref(order_request_inner.trader_id)
                 .lock()
@@ -215,7 +215,7 @@ pub fn cancel_order<'a>(
             match inner.order_type {
                 OrderType::Buy => {
                     // increase available funds
-                    if inner.trader_id != TraderId::Price_Enforcer {
+                    if !inner.trader_id.is_price_enforcer() {
                         accounts_data
                             .index_ref(inner.trader_id)
                             .lock()
@@ -226,7 +226,7 @@ pub fn cancel_order<'a>(
                 OrderType::Sell => {
                     // increase available assets
                     // need to dereference because each asset balance is a separate mutex (should this be changed?)
-                    if inner.trader_id != TraderId::Price_Enforcer {
+                    if !inner.trader_id.is_price_enforcer() {
                         *accounts_data
                             .index_ref(inner.trader_id)
                             .lock()
