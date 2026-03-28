@@ -1,111 +1,484 @@
-.overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
-  visibility: hidden;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+/* ── Theme ───────────────────────────────────────────── */
+:root {
+  --bg-base: #0b0e11;
+  --bg-panel: #131722;
+  --bg-panel-alt: #1a1e2e;
+  --accent: #2962ff;
+  --buy: #26a69a;
+  --sell: #ef5350;
+  --text-primary: #d1d4dc;
+  --text-secondary: #787b86;
+  --border-subtle: #1e2235;
+  --border-default: #2a2e3e;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 }
 
-#portfolio tr:nth-child(even) {
-  background-color: #19191fff;
-}
-
-tr {
-  position: relative;
-}
-
-tr:hover .overlay {
-  visibility: visible;
-}
-
-/* latin-ext */
-@font-face {
-  font-family: 'IBM Plex Sans Condensed';
-  font-style: normal;
-  font-weight: 200;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/ibmplexsanscondensed/v14/Gg8gN4UfRSqiPg7Jn2ZI12V4DCEwkj1E4LVeHY5m6bvipYY1Fw.woff2) format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'IBM Plex Sans Condensed';
-  font-style: normal;
-  font-weight: 200;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/ibmplexsanscondensed/v14/Gg8gN4UfRSqiPg7Jn2ZI12V4DCEwkj1E4LVeHY5m6bvspYY.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-
-.ibm-plex-sans-regular {
-  font-family: "IBM Plex Sans", serif;
-  font-weight: 400;
-  font-style: normal;
-}
-
-.ibm-plex-sans-bold {
-  font-family: "IBM Plex Sans", serif;
-  font-weight: 700;
-  font-style: normal;
-}
+/* ── Reset ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background-color: rgb(10, 10, 18);
+  background-color: var(--bg-base);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  overflow: hidden;
 }
 
-#glow {
-  z-index: -1;
-  animation: pulse 50s infinite;
+/* ── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+/* ── Panel ───────────────────────────────────────────── */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-@keyframes pulse {
-    0%, 100% {
-        box-shadow: 0 0 5px 3px rgba(111, 201, 242, 0.4), 0 0 10px 10px rgba(111, 201, 242, 0.36);
-    }
-    50% {
-        box-shadow: 0 0 8px 6px rgba(211, 111, 242, 0.4), 0 0 12px 12px rgba(211, 111, 242, 0.36);
-    }
+
+.panel-header {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
+
+/* ── Console Grid ────────────────────────────────────── */
+.console-grid {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 15% 15% 1fr 12.5%;
+  grid-template-rows: auto 38% 1fr;
+  grid-template-areas:
+    "stats   stats   stats   stats"
+    "order   tickers chart   book"
+    "port    port    chart2  book";
+  gap: 3px;
+  padding: 3px;
+}
+
+.area-stats   { grid-area: stats; }
+.area-order   { grid-area: order; }
+.area-tickers { grid-area: tickers; }
+.area-chart   { grid-area: chart; }
+.area-chart2  { grid-area: chart2; }
+.area-book    { grid-area: book; }
+.area-port    { grid-area: port; }
+
+/* ── Stats Bar ───────────────────────────────────────── */
+.stats-bar {
+  display: flex;
+  align-items: stretch;
+  padding: 10px 20px;
+  gap: 24px;
+  font-family: var(--font-mono);
+}
+
+.stats-bar .stats-section {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.stats-bar .stats-section + .stats-section {
+  border-left: 1px solid var(--border-default);
+  padding-left: 24px;
+}
+
+.stats-bar .stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.stats-bar .stat-value {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stats-bar .stat-value img {
+  width: 14px;
+  opacity: 0.7;
+}
+
+/* ── Order Form ──────────────────────────────────────── */
+.order-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  height: 100%;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.order-form label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.order-form label img {
+  width: 12px;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
+.order-form select,
+.order-form input[type="number"] {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.order-form select:focus,
+.order-form input[type="number"]:focus {
+  border-color: var(--accent);
+}
+
+.order-form .field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-form .btn-row {
+  display: flex;
+  gap: 6px;
+}
+
+.order-form .btn-buy,
+.order-form .btn-sell {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  border-radius: 3px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.order-form .btn-buy {
+  background: var(--buy);
+  color: #fff;
+}
+
+.order-form .btn-sell {
+  background: var(--sell);
+  color: #fff;
+}
+
+.order-form .btn-buy:hover,
+.order-form .btn-sell:hover {
+  opacity: 0.85;
+}
+
+/* ── Tickers ─────────────────────────────────────────── */
+.tickers-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  height: 100%;
+}
+
+.ticker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  flex: 1;
+}
+
+.ticker-row:hover {
+  background: var(--bg-panel-alt);
+}
+
+.ticker-row.active {
+  background: var(--bg-panel-alt);
+  border-left-color: var(--accent);
+}
+
+.ticker-symbol {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.ticker-price {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-align: right;
+}
+
+.ticker-price img {
+  width: 12px;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
+.ticker-change {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.ticker-change.up   { color: var(--buy); }
+.ticker-change.down { color: var(--sell); }
+.ticker-change.flat { color: var(--text-secondary); }
+
+/* ── Order Book ──────────────────────────────────────── */
+.order-book {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.order-book .book-header {
+  display: flex;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.order-book .book-header > div { flex: 1; }
 
 #buyside {
   overflow-y: auto;
   display: flex;
   flex-flow: column nowrap;
+  flex: 1;
 }
 
 #buyside > :first-child {
   margin-top: auto !important;
 }
 
+.book-sell-side {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.book-row {
+  display: flex;
+  padding: 2px 10px;
+}
+
+.book-row > div { flex: 1; }
+
+.book-row.buy-row { color: var(--buy); }
+.book-row.sell-row { color: var(--sell); }
+
+/* ── Portfolio ───────────────────────────────────────── */
+.portfolio {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.portfolio table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.portfolio thead tr {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel-alt);
+}
+
+.portfolio th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.portfolio th img {
+  width: 10px;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
+.portfolio td {
+  padding: 6px 10px;
+  color: var(--text-primary);
+}
+
+.portfolio tbody tr {
+  position: relative;
+  transition: background 0.12s;
+}
+
+.portfolio tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.portfolio tbody tr:hover {
+  background: var(--bg-panel-alt);
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  visibility: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+tr:hover .overlay {
+  visibility: visible;
+}
+
+.overlay input[type="button"] {
+  background: var(--sell);
+  border: none;
+  border-radius: 3px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 16px;
+  cursor: pointer;
+}
+
+.overlay input[type="button"]:hover {
+  opacity: 0.85;
+}
+
+/* ── Login / Wait / End screens ──────────────────────── */
+.login-page {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+}
+
+.login-page .login-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+  text-align: center;
+  max-width: 600px;
+}
+
+.login-page .login-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 320px;
+  gap: 12px;
+}
+
+.login-page .login-card input[type="text"],
+.login-page .login-card input[type="password"] {
+  padding: 10px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.login-page .login-card input[type="text"]:focus,
+.login-page .login-card input[type="password"]:focus {
+  border-color: var(--accent);
+}
+
+.login-page .login-card input[type="submit"] {
+  padding: 10px 0;
+  background: var(--accent);
+  border: none;
+  border-radius: 3px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: opacity 0.15s;
+}
+
+.login-page .login-card input[type="submit"]:hover {
+  opacity: 0.85;
+}
+
+/* ── Error Popup ─────────────────────────────────────── */
 .error-popup {
-  font-family: 'IBM Plex Sans', sans-serif;
+  font-family: var(--font-sans);
   position: fixed;
   bottom: 8%;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(255, 0, 0, 0.9);
+  background-color: var(--sell);
   color: white;
   padding: 10px 20px;
   border-radius: 3px;
-  font-size: 16px;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   animation: fadeout 3s forwards;
   z-index: 1000;
 }
 
 @keyframes fadeout {
-  0% {
-    opacity: 1;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+  0%  { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
 }

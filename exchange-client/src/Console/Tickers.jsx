@@ -1,48 +1,39 @@
 import token from "../assets/Token.png"
 
 const pct_change = (price_history) => {
-    if(price_history.length < 1) return;
+    if(price_history.length < 1) return null;
     let s = price_history.at(0)[1];
     let e = price_history.at(-1)[1];
     let c = 100 * (e - s) / s;
     if (c > 0) return (
-    <div style={{color: 'transparent', textShadow: "0 0 0 green", fontSize:"1.9vh", marginLeft:"2px"}}>
-    +{c.toFixed(2)}%🔺
-    </div>
+        <div className="ticker-change up">+{c.toFixed(2)}%</div>
     );
     if (c < 0) return (
-    <div style={{color: 'transparent', textShadow: "0 0 0 red", fontSize:"1.9vh", marginLeft:"2px"}}>
-    {c.toFixed(2)}%🔻
-    </div>);
-    return (<div style={{color:"grey", fontSize:"1.9vh", marginLeft:"2px"}}>{c.toFixed(2)}%</div>);
+        <div className="ticker-change down">{c.toFixed(2)}%</div>
+    );
+    return (<div className="ticker-change flat">{c.toFixed(2)}%</div>);
 }
 
 function Tickers({cur_ticker, setCur_ticker, all_tickers, game}) {
     return (
-        <div style={{display: "flex",
-                    flexDirection:"column",
-                    justifyContent:"space-around",
-                    width:"100%",
-                    height:"100%",
-                    fontSize:"4vh"
-                    }}>
+        <div className="tickers-list">
             {
-                all_tickers.map((symbol) => {return (
+                all_tickers.map((symbol) => (
                     <div key={symbol}
                     onClick={()=>setCur_ticker(symbol)}
-                    style= {cur_ticker == symbol ? {background: "#19191fff", width:"100%", borderRight:"20px solid rgb(10, 10, 18)", display:"flex", flexDirection:"row", justifyContent:"space-around"} : 
-                    { width:"100%", display:"flex", flexDirection:"row", justifyContent:"space-around"}}>
-                    <div className="ibm-plex-sans-bold">{symbol}</div>
-                    <div>
-                        <div>{game[symbol].price_history?.at(-1)?.[1]}<img src={token} style={{width:"2.1vh"}}/></div>
-                        {pct_change(game[symbol].price_history)}
+                    className={`ticker-row${cur_ticker === symbol ? ' active' : ''}`}>
+                        <div className="ticker-symbol">{symbol}</div>
+                        <div>
+                            <div className="ticker-price">
+                                {game[symbol].price_history?.at(-1)?.[1]}<img src={token}/>
+                            </div>
+                            {pct_change(game[symbol].price_history)}
+                        </div>
                     </div>
-                    </div>
-                )})
+                ))
             }
         </div>
     )
-
 }
 
 export default Tickers

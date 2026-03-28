@@ -4,29 +4,35 @@ import { useState } from 'react';
 
 const Plot = createPlotlyComponent(Plotly);
 const DepthChart = ({buyside, sellside, lowsell, lowbuy}) => {
-  
+
   const buyprices = buyside.map((_, i) => i + Math.max(lowbuy - 1, 0));
-  const sellprices = sellside.map((_, i) => i + lowsell); 
+  const sellprices = sellside.map((_, i) => i + lowsell);
 
   const layout = {
     xaxis: {
-      title: 'Price',
+      title: { text: 'Price', font: { color: '#787b86', family: 'IBM Plex Mono', size: 11 } },
       showgrid: true,
+      gridcolor: '#1e2235',
+      linecolor: '#2a2e3e',
+      tickfont: { color: '#787b86', family: 'IBM Plex Mono', size: 10 },
     },
     yaxis: {
-      title: 'Volume',
-      autorange: true
+      title: { text: 'Volume', font: { color: '#787b86', family: 'IBM Plex Mono', size: 11 } },
+      autorange: true,
+      gridcolor: '#1e2235',
+      linecolor: '#2a2e3e',
+      tickfont: { color: '#787b86', family: 'IBM Plex Mono', size: 10 },
     },
     showlegend: false,
     autosize: true,
     margin: {
-      t: 10, 
-      b: 30, 
-      l: 50, 
-      r: 10, 
+      t: 10,
+      b: 30,
+      l: 50,
+      r: 10,
     },
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
+    paper_bgcolor: '#131722',
+    plot_bgcolor: '#131722',
   };
 
   const traces = [
@@ -34,21 +40,21 @@ const DepthChart = ({buyside, sellside, lowsell, lowbuy}) => {
       x: buyprices,
       y: buyside,
       type: 'scatter',
-      mode: 'lines', 
-      name: 'Line 1 (Green)',
-      line: { color: 'green', shape: 'hv'}, 
-      fill: 'tozeroy', 
-      fillcolor: 'rgba(0, 255, 0, 0.3)', 
+      mode: 'lines',
+      name: 'Bids',
+      line: { color: '#26a69a', shape: 'hv'},
+      fill: 'tozeroy',
+      fillcolor: 'rgba(38, 166, 154, 0.15)',
     },
     {
       x: sellprices,
       y: sellside,
       type: 'scatter',
-      mode: 'lines', 
-      name: 'Line 2 (Red)',
-      line: { color: 'red', shape: 'hv'}, 
-      fill: 'tozeroy', 
-      fillcolor: 'rgba(255, 0, 0, 0.3)', 
+      mode: 'lines',
+      name: 'Asks',
+      line: { color: '#ef5350', shape: 'hv'},
+      fill: 'tozeroy',
+      fillcolor: 'rgba(239, 83, 80, 0.15)',
     },
   ];
 
@@ -59,7 +65,7 @@ const DepthChart = ({buyside, sellside, lowsell, lowbuy}) => {
         data={traces}
         layout={layout}
         config={{
-          displayModeBar: false, 
+          displayModeBar: false,
           scrollZoom: false,
           responsive: true,
         }}

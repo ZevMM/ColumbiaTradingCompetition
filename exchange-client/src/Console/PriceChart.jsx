@@ -6,15 +6,12 @@ const Plot = createPlotlyComponent(Plotly);
 
 function makeCandles(prices, idx, candles) {
   //no new prices
-  if (idx >= prices.length) return idx;  
-  
+  if (idx >= prices.length) return idx;
+
   let open, hi, lo, close, volume;
-  
+
   let end_time = Math.floor(prices.at(-1)[0] / 60);
-  let t = Math.floor(prices[idx][0] / 60) 
-  //good bc makes chart start at first trade
-  //rather than showing a bunch of dead time before the game starts
-  //(could also have changed start_time initialization point server side ofc)
+  let t = Math.floor(prices[idx][0] / 60)
 
   while (t < end_time) {
       //create tick for time period t
@@ -41,7 +38,7 @@ function makeCandles(prices, idx, candles) {
       t = Math.floor(prices[idx][0] / 60)
   } return idx
 }
-  
+
 
 const PriceChart = ({game, cur_ticker}) => {
   const priceref = useRef([])
@@ -53,7 +50,7 @@ const PriceChart = ({game, cur_ticker}) => {
 
 
   useEffect(() => {
-    
+
     candles.current = []
     setRevision(Object.keys(game).findIndex((ct) => ct == cur_ticker) * -1)
     c_idx.current = makeCandles(priceref.current, 0, candles.current)
@@ -76,31 +73,38 @@ const PriceChart = ({game, cur_ticker}) => {
 
   const layout = {
     xaxis: {
-      rangeslider: { visible: true },
+      rangeslider: { visible: true, bgcolor: '#131722' },
       range: intervals.length > 22 ? [intervals[intervals.length - 22], intervals[intervals.length]] : [0, 22],
+      gridcolor: '#1e2235',
+      linecolor: '#2a2e3e',
+      tickfont: { color: '#787b86', family: 'IBM Plex Mono', size: 10 },
     },
     yaxis: {
-      title: 'Price',
+      title: { text: 'Price', font: { color: '#787b86', family: 'IBM Plex Mono', size: 11 } },
+      gridcolor: '#1e2235',
+      linecolor: '#2a2e3e',
+      tickfont: { color: '#787b86', family: 'IBM Plex Mono', size: 10 },
     },
     yaxis2: {
-      title: 'Volume',
+      title: { text: 'Volume', font: { color: '#787b86', family: 'IBM Plex Mono', size: 11 } },
       overlaying: 'y',
       side: 'right',
-      showgrid: false, // Disable gridlines on secondary y-axis
+      showgrid: false,
+      linecolor: '#2a2e3e',
+      tickfont: { color: '#787b86', family: 'IBM Plex Mono', size: 10 },
     },
     showlegend: false,
     autosize: true,
     margin: {
-      t: 10, // top margin (reduce it further if needed)
-      b: 10, // bottom margin (reduce it further if needed)
-      l: 50, // left margin (reduce it further if needed)
-      r: 50, // right margin (reduce it further if needed)
+      t: 10,
+      b: 10,
+      l: 50,
+      r: 50,
     },
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)'
+    paper_bgcolor: '#131722',
+    plot_bgcolor: '#131722',
   };
 
-  // Define the traces for Candlestick and Bar chart
   const traces = [
     {
       x: intervals,
@@ -111,14 +115,14 @@ const PriceChart = ({game, cur_ticker}) => {
       type: 'candlestick',
       name: 'Candlestick',
       increasing: {
-        line: { color: 'green' }, // Solid color for increasing candles (green)
-        fillcolor: 'rgba(0, 255, 0, 0.6)', // Solid fill color for increasing candles
+        line: { color: '#26a69a' },
+        fillcolor: 'rgba(38, 166, 154, 0.6)',
       },
       decreasing: {
-        line: { color: 'red' }, // Solid color for decreasing candles (red)
-        fillcolor: 'rgba(255, 0, 0, 0.6)', // Solid fill color for decreasing candles
+        line: { color: '#ef5350' },
+        fillcolor: 'rgba(239, 83, 80, 0.6)',
       },
-      yaxis: 'y2', // This ensures the candlestick uses the secondary y-axis
+      yaxis: 'y2',
     },
     {
       x: intervals,
@@ -127,8 +131,8 @@ const PriceChart = ({game, cur_ticker}) => {
       name: 'Volume',
       yaxis: 'y',
       marker: {
-        color: 'rgba(255, 123, 0, 0.3)', // Semi-transparent blue for volume bars
-      }, // This places the volume chart on the primary y-axis
+        color: 'rgba(41, 98, 255, 0.25)',
+      },
     },
   ];
 
@@ -138,7 +142,7 @@ const PriceChart = ({game, cur_ticker}) => {
       data={traces}
       layout={layout}
       config={{
-        displayModeBar: true,
+        displayModeBar: 'hover',
         scrollZoom: true,
         responsive: true,
       }}

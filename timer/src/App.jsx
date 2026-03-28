@@ -1,109 +1,92 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function App() {
-  const [time, setTime] = useState(0); // Time in seconds
+  const [time, setTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false); // To track pause/unpause state
-  const [inputTime, setInputTime] = useState(""); // For user input in minutes
+  const [isPaused, setIsPaused] = useState(false);
+  const wsRef = useRef(null);
 
   useEffect(() => {
-    let timer;
-    if (isRunning && !isPaused && time > 0) {
-      timer = setInterval(() => {
-        setTime((prevTime) => prevTime - 1);
-      }, 1000);
-    } else if (time === 0 && isRunning) {
-      setIsRunning(false);
-      sendHttpRequest("end_game"); // Send HTTP request on end
+    function connect() {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // In production, admin server WebSocket is proxied at /ws by nginx.
+      // In dev, connect directly to admin server.
+      // Auto-detect: if served under /timer, WS is at /timer/ws; otherwise /ws
+      const basePath = window.location.pathname.startsWith('/timer') ? '/timer' : '';
+      const wsUrl = import.meta.env.VITE_ADMIN_WS_URL || `${proto}//${window.location.host}${basePath}/ws`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        switch (msg.type) {
+          case 'timer_state':
+          case 'timer_tick':
+            setTime(msg.remaining || 0);
+            setIsRunning(msg.running);
+            setIsPaused(msg.paused);
+            break;
+          case 'game_started':
+            setTime(msg.remaining || msg.duration || 0);
+            setIsRunning(true);
+            setIsPaused(false);
+            break;
+          case 'game_paused':
+            setIsPaused(true);
+            break;
+          case 'game_resumed':
+            setIsPaused(false);
+            break;
+          case 'game_ended':
+            setTime(0);
+            setIsRunning(false);
+            setIsPaused(false);
+            break;
+        }
+      };
+
+      ws.onclose = () => {
+        setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+
+      wsRef.current = ws;
     }
-    return () => clearInterval(timer); // Cleanup interval on unmount or stop
-  }, [isRunning, isPaused, time]);
 
-  const handleStart = () => {
-    if (time > 0) {
-      setIsRunning(true);
-      setIsPaused(false); // Ensure the timer starts in an unpaused state
-      sendHttpRequest("start_game"); // Send HTTP request on start
-    } else {
-      alert("Please enter a valid time in minutes.");
-    }
-  };
+    connect();
 
-  const handlePauseUnpause = () => {
-    sendHttpRequest(isPaused ? "start_game" : "end_game");
-    setIsPaused((prevPaused) => !prevPaused); // Toggle pause/unpause state
-  };
+    return () => {
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, []);
 
-  const handleClear = () => {
-    setIsRunning(false);
-    setIsPaused(false);
-    setTime(0);
-    setInputTime(""); // Clear the input field
-    sendHttpRequest("end_game"); // Send HTTP request on clear
-  };
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
 
-  const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:8080';
-
-  const sendHttpRequest = async (action) => {
-    try {
-      const response = await fetch(`${serverUrl}/${action}`);
-      if (!response.ok) {
-        console.error("Failed to send HTTP request");
-      }
-    } catch (error) {
-      console.error("Error sending HTTP request:", error);
-    }
-  };
+  let statusText = '';
+  let statusColor = '#888';
+  if (isRunning && !isPaused) {
+    statusColor = '#6ef';
+  } else if (isPaused) {
+    statusText = ' (PAUSED)';
+    statusColor = '#fa3';
+  }
 
   return (
-    <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "rgb(10, 10, 18)" }}>
-      <div style={{ fontFamily: "IBM Plex Sans", color: "white" }}>
-        <h2 style={{ marginTop: "20px", textAlign: "center", fontSize: "10vh" }}>
-          Time Remaining: {Math.floor(time / 60)}:{String(time % 60).padStart(2, "0")}
+    <div style={{
+      height: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "rgb(10, 10, 18)",
+    }}>
+      <div style={{ fontFamily: "IBM Plex Sans", color: "white", textAlign: "center" }}>
+        <h2 style={{ fontSize: "10vh", color: statusColor }}>
+          Time Remaining: {minutes}:{String(seconds).padStart(2, "0")}
+          {statusText}
         </h2>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div>
-          <input
-            type="number"
-            placeholder="Set time (minutes)"
-            value={inputTime}
-            onChange={
-              (e) => {
-                setInputTime(e.target.value);
-                let parsedTime = parseFloat(e.target.value); // Parse input as a float for fractional minutes
-                if (!isNaN(parsedTime) && parsedTime > 0) {
-                  setTime(Math.round(parsedTime * 60));
-                } else if (e.target.value == "") {
-                  setTime(0);
-                }
-              }
-            }
-            disabled={isRunning}
-            style={{ padding: "10px", fontSize: "16px", marginRight: "10px" }}
-          />
-          {!isRunning ? (
-            <button
-              onClick={handleStart}
-              style={{ padding: "10px 20px", fontSize: "16px", marginRight: "10px" }}
-            >
-              Start
-            </button>
-          ) : (
-            <button
-              onClick={handlePauseUnpause}
-              style={{ padding: "10px 20px", fontSize: "16px", marginRight: "10px" }}
-            >
-              {isPaused ? "Continue" : "Pause"}
-            </button>
-          )}
-            <button
-              onClick={handleClear}
-              style={{ padding: "10px 20px", fontSize: "16px" }}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import WaitScreen from './Views/WaitScreen'
 import EndScreen from './Views/EndScreen'
 import ErrorPopup from './Error'
 
-const addr = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:8080/orders/ws`
+const addr = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/orders/ws`
 
 function App() {
   const [user, setUser] = useState(null)

@@ -7,41 +7,32 @@ function StatsBar({account, game}) {
         }, 0
     )
 
-
     return (
-        <div style={{display:"flex", width:"100%", flexDirection:"row", justifyContent:"space-around", color:"white"}}>
-            <div style={{flex:2, marginLeft:"1vw", marginRight:"2.5vw"}}>
-                <div style={{fontSize:"1.7vh"}}>Assets</div>
-                <div style={{display:"flex", flexDirection:"row", justifyContent:"space-between", flex:1}}>
-                    <div>
-                        <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Cash</div>
-                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{account.cents_balance}</div>
-                    </div>
-                    {Object.entries(account.asset_balances).map(([k,v]) => {
-                        return (
-                            <div>
-                            <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>{k}</div>
-                            <div style={{fontSize:"3vh", fontWeight:"bold"}}>{v}</div>
-                            </div>
-                        )
-                    })}
+        <div className="stats-bar">
+            <div className="stats-section">
+                <div>
+                    <div className="stat-label">Cash</div>
+                    <div className="stat-value"><img src={token}/>{account.cents_balance}</div>
                 </div>
+                {Object.entries(account.asset_balances).map(([k,v]) => (
+                    <div key={k}>
+                        <div className="stat-label">{k}</div>
+                        <div className="stat-value">{v}</div>
+                    </div>
+                ))}
             </div>
-            <div style={{flex:3, marginLeft:"2.5vw", marginRight:"1vw"}}>
-                <div style={{fontSize:"1.7vh"}}>Account Statistics</div>
-                <div style={{display:"flex", flexDirection:"row", justifyContent:"space-between", flex:1}}>
-                    <div>
-                        <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Unrealized P/L</div>
-                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{urpl.toFixed(0)}</div>
-                    </div>
-                    <div>
-                        <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Net Account Value</div>
-                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{(urpl + account.cents_balance).toFixed(0)}</div>
-                    </div>
-                    <div>
-                        <div className="ibm-plex-sans-bold" style={{fontSize:"2.3vh"}}>Available Margin</div>
-                        <div style={{fontSize:"3vh", fontWeight:"bold", display:"flex", alignItems:"center"}}><img src={token} style={{width: '2.5vh'}}/>{account.net_cents_balance}</div>
-                    </div>
+            <div className="stats-section">
+                <div>
+                    <div className="stat-label">Unrealized P/L</div>
+                    <div className="stat-value"><img src={token}/>{urpl.toFixed(0)}</div>
+                </div>
+                <div>
+                    <div className="stat-label">Net Account Value</div>
+                    <div className="stat-value"><img src={token}/>{(urpl + account.cents_balance).toFixed(0)}</div>
+                </div>
+                <div>
+                    <div className="stat-label">Available Margin</div>
+                    <div className="stat-value"><img src={token}/>{account.net_cents_balance}</div>
                 </div>
             </div>
         </div>

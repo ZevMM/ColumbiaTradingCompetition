@@ -2,16 +2,13 @@ import { useState } from "react"
 import token from "../assets/Token.png"
 
 function Portfolio({ws, account, user}) {
-    //const [tab, setTab] = useState(1)
-    //return tab == 1 ? 
     return (
-        <div style={{width:"100%", height:"98%", overflowY:"auto"}}>
-        <div>Active Orders</div>
-        <table id="portfolio" style={{width: "100%"}}>
+        <div className="portfolio">
+        <table>
             <thead>
-            <tr style={{position: "sticky", top: 0, zIndex: 1, background:"rgb(0, 0, 225)"}}>
+            <tr>
                 <th>Symbol</th>
-                <th>Price (<img src={token} style={{width:"12px"}} />)</th>
+                <th>Price <img src={token}/></th>
                 <th>Volume</th>
                 <th>Side</th>
             </tr>
@@ -19,7 +16,7 @@ function Portfolio({ws, account, user}) {
             <tbody>
             {account.active_orders.map((o) => {
                 return (
-                    <tr>
+                    <tr key={o.order_id}>
                         <td>{o.symbol}</td>
                         <td>{o.price}</td>
                         <td>{o.amount}</td>
@@ -46,17 +43,6 @@ function Portfolio({ws, account, user}) {
         </table>
         </div>
     )
-    /*
-    :
-    (
-        <>
-        <span onClick={()=>setTab(1)}>Orders</span><span>Positions</span>
-        <div>
-            Positions
-        </div>
-        </>
-    )
-    */
 }
 
 export default Portfolio

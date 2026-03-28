@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard - Columbia Trading Competition</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #0a0a12; color: #e0e0e0; padding: 24px; }
+  h1 { font-size: 1.6rem; margin-bottom: 20px; color: #fff; }
+  h2 { font-size: 1.1rem; margin-bottom: 12px; color: #8899bb; border-bottom: 1px solid #1a1a2e; padding-bottom: 6px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: #12121e;
+    border: 1px solid #1e1e34;
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  button {
+    padding: 8px 18px;
+    border: 1px solid #334;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin: 4px 4px 4px 0;
+    transition: background 0.15s;
+  }
+  button:hover { background: #252540; }
+  button.primary { background: #1a4a2e; border-color: #2a6a3e; color: #6f6; }
+  button.primary:hover { background: #1a6a3e; }
+  button.danger { background: #4a1a1a; border-color: #6a2a2a; color: #f66; }
+  button.danger:hover { background: #6a1a1a; }
+  button.warn { background: #4a3a1a; border-color: #6a5a2a; color: #fa3; }
+  button.warn:hover { background: #5a4a1a; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  input[type="number"], input[type="file"] {
+    padding: 7px 10px;
+    background: #0e0e1a;
+    border: 1px solid #334;
+    border-radius: 4px;
+    color: #eee;
+    font-size: 0.9rem;
+    margin: 4px 4px 4px 0;
+    width: 140px;
+  }
+
+  .timer-display {
+    font-size: 3rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 16px 0;
+    color: #6ef;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-display.stopped { color: #888; }
+  .timer-display.paused { color: #fa3; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .status-badge.running { background: #1a4a2e; color: #6f6; }
+  .status-badge.stopped { background: #4a1a1a; color: #f66; }
+
+  .log { background: #0a0a14; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; margin-top: 10px; color: #99a; white-space: pre-wrap; }
+  .log .error { color: #f66; }
+  .log .success { color: #6f6; }
+
+  .score-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }
+  .score-table th, .score-table td { padding: 5px 10px; text-align: left; border-bottom: 1px solid #1a1a2e; }
+  .score-table th { color: #8899bb; }
+  .score-table tr:nth-child(1) td { color: #ffd700; }
+  .score-table tr:nth-child(2) td { color: #c0c0c0; }
+  .score-table tr:nth-child(3) td { color: #cd7f32; }
+</style>
+</head>
+<body>
+
+<h1>Competition Admin Dashboard</h1>
+
+<div class="grid">
+  <!-- Timer / Game Control -->
+  <div class="card">
+    <h2>Game Control</h2>
+    <div class="timer-display stopped" id="timer">0:00</div>
+    <div style="text-align:center; margin-bottom:12px;">
+      <input type="number" id="minutes" placeholder="Minutes" value="10" min="0.5" step="0.5">
+    </div>
+    <div style="text-align:center;">
+      <button class="primary" id="btn-start" onclick="startGame()">Start Game</button>
+      <button class="warn" id="btn-pause" onclick="pauseGame()" disabled>Pause</button>
+      <button class="danger" id="btn-end" onclick="endGame()" disabled>End Game</button>
+    </div>
+  </div>
+
+  <!-- Process Status -->
+  <div class="card">
+    <h2>Process Status</h2>
+    <div id="process-status">Loading...</div>
+    <div style="margin-top:12px">
+      <button onclick="refreshStatus()">Refresh</button>
+      <button class="warn" onclick="restartServer()">Restart Server</button>
+    </div>
+  </div>
+
+  <!-- Bot Control -->
+  <div class="card">
+    <h2>Price Enforcer Bot</h2>
+    <div>Status: <span id="bot-status" class="status-badge stopped">unknown</span></div>
+    <div style="margin-top:12px">
+      <button class="primary" onclick="startBot()">Start Bot</button>
+      <button class="danger" onclick="stopBot()">Stop Bot</button>
+      <button class="warn" onclick="restartBot()">Restart Bot</button>
+    </div>
+  </div>
+
+  <!-- Scoring -->
+  <div class="card">
+    <h2>Scoring</h2>
+    <button onclick="tallyScore()">Run Score Tally</button>
+    <div id="score-results"></div>
+  </div>
+
+  <!-- Config Upload -->
+  <div class="card">
+    <h2>Upload Config</h2>
+    <p style="font-size:0.8rem;color:#777;margin-bottom:8px;">Upload a new config.json for the matching engine (requires server restart)</p>
+    <input type="file" id="config-file" accept=".json">
+    <button onclick="uploadConfig()">Upload</button>
+    <button onclick="viewConfig()">View Current</button>
+    <div id="config-info" class="log" style="display:none;"></div>
+  </div>
+
+  <!-- Data Upload -->
+  <div class="card">
+    <h2>Upload Price Data</h2>
+    <p style="font-size:0.8rem;color:#777;margin-bottom:8px;">Upload price data files for the bots (requires bot restart)</p>
+    <input type="file" id="data-files" multiple>
+    <button onclick="uploadData()">Upload</button>
+  </div>
+</div>
+
+<!-- Activity Log -->
+<div class="card" style="max-width:1000px; margin-top:20px;">
+  <h2>Activity Log</h2>
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+// Detect base path: when proxied under /admin, API calls go to /admin/api/...
+const basePath = window.location.pathname.replace(/\/+$/, '');
+const API = window.location.origin + basePath;
+let ws;
+
+function log(msg, cls = '') {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.prepend(line);
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay(state) {
+  const el = document.getElementById('timer');
+  el.textContent = formatTime(state.remaining || 0);
+  el.className = 'timer-display ' + (state.running ? (state.paused ? 'paused' : '') : 'stopped');
+
+  document.getElementById('btn-start').disabled = state.running && !state.paused;
+  document.getElementById('btn-pause').disabled = !state.running;
+  document.getElementById('btn-pause').textContent = state.paused ? 'Resume' : 'Pause';
+  document.getElementById('btn-end').disabled = !state.running;
+}
+
+function connectWS() {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${window.location.host}${basePath}/ws`);
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'timer_tick' || msg.type === 'timer_state' ||
+        msg.type === 'game_started' || msg.type === 'game_ended' ||
+        msg.type === 'game_paused' || msg.type === 'game_resumed') {
+      updateTimerDisplay(msg);
+    }
+    if (msg.type === 'game_started') log('Game started', 'success');
+    if (msg.type === 'game_ended') log('Game ended', 'error');
+    if (msg.type === 'game_paused') log('Game paused');
+    if (msg.type === 'game_resumed') log('Game resumed', 'success');
+  };
+  ws.onclose = () => { setTimeout(connectWS, 2000); };
+  ws.onerror = () => { ws.close(); };
+}
+
+async function api(method, path, body) {
+  try {
+    const opts = { method };
+    if (body instanceof FormData) {
+      opts.body = body;
+    } else if (body) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    const resp = await fetch(`${API}${path}`, opts);
+    const data = await resp.json();
+    if (!data.ok) log(`Error: ${data.error || 'Unknown'}`, 'error');
+    return data;
+  } catch (e) {
+    log(`Request failed: ${e.message}`, 'error');
+    return { ok: false };
+  }
+}
+
+async function startGame() {
+  const minutes = parseFloat(document.getElementById('minutes').value) || 10;
+  log(`Starting game (${minutes} min)...`);
+  await api('POST', '/api/start', { minutes });
+}
+
+async function pauseGame() {
+  log('Toggling pause...');
+  await api('POST', '/api/pause');
+}
+
+async function endGame() {
+  if (!confirm('End the game now?')) return;
+  log('Ending game...');
+  await api('POST', '/api/end');
+}
+
+async function tallyScore() {
+  log('Running score tally...');
+  const result = await api('GET', '/api/score');
+  const el = document.getElementById('score-results');
+  if (result.ok && Array.isArray(result.data)) {
+    let html = '<table class="score-table"><tr><th>#</th><th>Trader</th><th>Value</th></tr>';
+    result.data.forEach(([id, val], i) => {
+      html += `<tr><td>${i + 1}</td><td>${id}</td><td>${val.toLocaleString()}</td></tr>`;
+    });
+    html += '</table>';
+    el.innerHTML = html;
+    log(`Scores tallied: ${result.data.length} traders`, 'success');
+  } else {
+    el.textContent = 'No scores available';
+  }
+}
+
+async function refreshStatus() {
+  const result = await api('GET', '/api/status');
+  const el = document.getElementById('process-status');
+  if (result.ok) {
+    let html = '';
+    for (const [name, status] of Object.entries(result.processes)) {
+      const cls = status === 'RUNNING' ? 'running' : 'stopped';
+      html += `<div style="margin:4px 0">${name} <span class="status-badge ${cls}">${status}</span></div>`;
+    }
+    el.innerHTML = html;
+    // Update bot status badge
+    const botEl = document.getElementById('bot-status');
+    const botStatus = result.processes['price-enforcer'] || 'UNKNOWN';
+    botEl.textContent = botStatus;
+    botEl.className = 'status-badge ' + (botStatus === 'RUNNING' ? 'running' : 'stopped');
+  }
+}
+
+async function restartServer() {
+  if (!confirm('Restart the matching engine? All connections will drop.')) return;
+  log('Restarting matching engine...');
+  const r = await api('POST', '/api/restart-server');
+  if (r.ok) log('Server restart initiated', 'success');
+  setTimeout(refreshStatus, 3000);
+}
+
+async function startBot() {
+  log('Starting bot...');
+  const r = await api('POST', '/api/start-bot');
+  if (r.ok) log('Bot start initiated', 'success');
+  setTimeout(refreshStatus, 1000);
+}
+
+async function stopBot() {
+  log('Stopping bot...');
+  const r = await api('POST', '/api/stop-bot');
+  if (r.ok) log('Bot stopped', 'success');
+  setTimeout(refreshStatus, 1000);
+}
+
+async function restartBot() {
+  log('Restarting bot...');
+  const r = await api('POST', '/api/restart-bot');
+  if (r.ok) log('Bot restart initiated', 'success');
+  setTimeout(refreshStatus, 2000);
+}
+
+async function uploadConfig() {
+  const file = document.getElementById('config-file').files[0];
+  if (!file) { log('No file selected', 'error'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  log(`Uploading config: ${file.name}...`);
+  const r = await api('POST', '/api/upload/config', fd);
+  if (r.ok) log('Config uploaded. Restart server to apply.', 'success');
+}
+
+async function uploadData() {
+  const files = document.getElementById('data-files').files;
+  if (!files.length) { log('No files selected', 'error'); return; }
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  log(`Uploading ${files.length} data file(s)...`);
+  const r = await api('POST', '/api/upload/data', fd);
+  if (r.ok) log(`Uploaded: ${r.files.join(', ')}. Restart bot to apply.`, 'success');
+}
+
+async function viewConfig() {
+  const el = document.getElementById('config-info');
+  const r = await api('GET', '/api/config');
+  if (r.ok) {
+    el.textContent = JSON.stringify(r.config, null, 2);
+    el.style.display = 'block';
+  }
+}
+
+connectWS();
+refreshStatus();
+setInterval(refreshStatus, 15000);
+</script>
+</body>
+</html>

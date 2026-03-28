@@ -9,7 +9,7 @@ import StatsBar from './StatsBar';
 
 function Console({ws, user, game, account}) {
   if (!game || !account) { return <div>Loading...</div> }
-  
+
   const [cur_ticker, setCur_ticker] = useState(Object.keys(game)[0]);
   const all_tickers = Object.keys(game);
   const maxprice = game[all_tickers[0]].buy_side_limit_levels.length - 1;
@@ -22,7 +22,7 @@ function Console({ws, user, game, account}) {
     cumsum_buy.unshift(cs)
     return cs
   }, 0)
-  
+
   let cumsum_sell = []
   let lowsell = game[cur_ticker].sell_side_limit_levels.findIndex((e) => e.total_volume > 0)
   let highsell = game[cur_ticker].sell_side_limit_levels.findLastIndex((e) => e.total_volume > 0)
@@ -31,35 +31,36 @@ function Console({ws, user, game, account}) {
     cumsum_sell.push(cs)
     return cs
   }, 0)
-  
-  
-  
+
+
+
   return (
-    <div style={{fontFamily:"IBM Plex Sans Condensed", color:"white"}}>
-        <div style={{background: "#19191fff", width:"100%", height:"10%", "left": 0, "top":0, position:"absolute", boxShadow:"0 0px 2px rgba(0, 0, 0, 1)"}}>
+    <div className="console-grid">
+        <div className="area-stats panel">
             <StatsBar account={account} game={game} />
         </div>
-        <div style={{background: "rgb(10, 10, 18)", width:"15%", height:"38%", "left": 0, "top":"10%", position:"absolute"}}>
+        <div className="area-order panel">
+            <div className="panel-header">Order Entry</div>
             <OrderForm ws={ws} user={user} all_tickers={all_tickers} maxprice={maxprice}/>
         </div>
-        <div style={{background: "rgb(10, 10, 18)", width:"15%", height:"38%", "left": "15%", "top":"10%", position:"absolute", borderLeft:"1px solid white"}}>
+        <div className="area-tickers panel">
+            <div className="panel-header">Markets</div>
             <Tickers cur_ticker={cur_ticker} setCur_ticker={setCur_ticker} all_tickers={all_tickers} game={game}/>
         </div>
-        <div style={{background: "rgb(10, 10, 18)", width:"30%", height:"52%", "left": 0, "top":"48%", position:"absolute", borderTop:"1px solid white"}}>
+        <div className="area-port panel">
+            <div className="panel-header">Active Orders</div>
             <Portfolio ws={ws} account={account} user={user}/>
         </div>
 
-        <div style={{background: "rgb(10, 10, 18)", width:"57%", height:"54%", "left": "30.5%", "top":"11%", position:"absolute"}}>
+        <div className="area-chart panel" style={{padding: 0}}>
             <PriceChart game={game} cur_ticker={cur_ticker} />
         </div>
-        <div style={{background: "rgb(10, 10, 18)", width:"57%", height:"34%", "left": "30.5%", "top":"65%", position:"absolute"}}>
+        <div className="area-chart2 panel" style={{padding: 0}}>
             <DepthChart buyside={cumsum_buy} sellside={cumsum_sell} lowsell={lowsell} lowbuy={lowbuy}/>
         </div>
-        <div style={{background: "rgb(10, 10, 18)", width:"12%", height:"88%", "left": "87.5%", "top":"11%", position:"absolute"}}>
+        <div className="area-book panel">
+            <div className="panel-header">Order Book</div>
             <OrderBook buyside={cumsum_buy} sellside={cumsum_sell} lowsell={lowsell} lowbuy={lowbuy}/>
-        </div>
-
-        <div id="glow" style={{position:"absolute", left:"30.5%", top:"11%", bottom:"1%", right:"0.5%"}}>
         </div>
     </div>
   )

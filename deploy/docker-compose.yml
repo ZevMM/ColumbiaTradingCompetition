@@ -1,0 +1,47 @@
+# Single-container deployment
+#
+# Local testing:
+#   docker compose -f deploy/docker-compose.yml up --build
+#   Open http://localhost (exchange), http://localhost/timer, http://localhost/admin
+#
+# Production (VPS):
+#   docker compose -f deploy/docker-compose.yml --profile prod up --build -d
+#   Then run: docker exec <container> bash /deploy/setup-ssl.sh yourdomain.com you@email.com
+
+services:
+  # Local dev — path-based routing, no auth, no SSL
+  competition:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        NGINX_CONF: deploy/nginx.local.conf
+    ports:
+      - "80:80"
+    volumes:
+      - ../python_bots/data:/app/python_bots/data
+      - ../matching-engine/config.json:/app/matching-engine/config.json
+    environment:
+      - RUST_LOG=info
+
+  # Production — subdomain-based, auth, SSL
+  competition-prod:
+    profiles: ["prod"]
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        NGINX_CONF: deploy/nginx.conf
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../python_bots/data:/app/python_bots/data
+      - ../matching-engine/config.json:/app/matching-engine/config.json
+      - letsencrypt:/etc/letsencrypt
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+
+volumes:
+  letsencrypt:

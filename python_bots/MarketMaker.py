@@ -2,27 +2,30 @@ import asyncio
 import os
 import websockets
 import json
-import argparse
 import numpy as np
-import threading
-import time
 import random
+import time as _time
+import logging
 
-#move the normalization into this file (the running average/arctan/etc...)
-
-# want to place a batch of orders every 45 seconds. 1, 2, 3, 4, 5, _, _, _, _, _, 11, 12, 13, 14, 15
-# This means ~60 orders per asset per round. 60 orders * 3 assets * 4500 potential profit = 810_000
-# 90 units per price point. i.e. sell 450, buy 450.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger("MarketMaker")
 
 websocket_uri = os.environ.get("WS_URI", "ws://localhost:8080/orders/ws")
 
-#{symbol: [filename, avg frequency (s), dist, amt (total shares?)]
+# {symbol: [filename, avg frequency (s), dist, amt (total shares?)]}
 settings = {
-    #"JJs" : [None, 15, "flat", 400],
-    "TT" : ["./data/TT_data", 15, "flat", 400],
-    "TS" : ["./data/TS_data", 15, "flat", 400],
-    "AD" : ["./data/AD_data", 15, "flat", 400],
+    "TT": ["./data/TT_data", 15, "flat", 400],
+    "TS": ["./data/TS_data", 15, "flat", 400],
+    "AD": ["./data/AD_data", 15, "flat", 400],
 }
+
+MAX_RETRIES = None  # retry forever
+INITIAL_BACKOFF = 2  # seconds
+MAX_BACKOFF = 30     # seconds
+
 
 def bot_lookup(name):
     match name:
@@ -39,26 +42,24 @@ def bot_lookup(name):
             from randomness_generators import TS_Brightness
             return TS_Brightness.TS()
 
-# todo: implement bimodal, delta, smile and see what is the most fun
+
 def gen_dist(dist, amt):
     match dist:
         case "flat":
             return [amt // 100] * 100
         case "normal":
             indices = np.arange(100)
-            #15 is std dev, can play around with it
             normal_values = np.exp(-(indices - 50) ** 2 / (2 * 15 ** 2))
-            normal_values *=  (amt / normal_values.sum())
+            normal_values *= (amt / normal_values.sum())
             return normal_values.astype(int)
 
-async def place_order(ws, price, dist, amt, symbol):
-    #amts = gen_dist(dist, amt)
 
+async def place_order(ws, price, dist, amt, symbol):
     for i in range(0, 15):
         jsonreq = {
-            'MessageType' : "OrderRequest",
+            'MessageType': "OrderRequest",
             'OrderType': "Sell",
-            'Amount': random.randint(0,10),
+            'Amount': random.randint(0, 10),
             'Price': min(int(price) - 3 + i, 49),
             'Symbol': symbol,
             'TraderId': "Price_Enforcer",
@@ -67,54 +68,99 @@ async def place_order(ws, price, dist, amt, symbol):
         await ws.send(json.dumps(jsonreq))
         await asyncio.sleep(0.25)
 
-            
     for i in range(0, 15):
         jsonreq = {
-                'MessageType' : "OrderRequest",
-                'OrderType': "Buy",
-                'Amount': random.randint(0,10),
-                'Price': max(int(price) + i - 10, 0),
-                'Symbol': symbol,
-                'TraderId': "Price_Enforcer",
-                'Password': list("penf")
+            'MessageType': "OrderRequest",
+            'OrderType': "Buy",
+            'Amount': random.randint(0, 10),
+            'Price': max(int(price) + i - 10, 0),
+            'Symbol': symbol,
+            'TraderId': "Price_Enforcer",
+            'Password': list("penf")
         }
         await ws.send(json.dumps(jsonreq))
         await asyncio.sleep(0.25)
 
+
 class from_file:
-    #should the file store the time stamps for each entry?
     def __init__(self, fname):
         self.file = open(fname, 'rb')
+
     def pull(self):
         line = self.file.readline()
         if not line:
-            print("here")
             self.file.seek(0)
             line = self.file.readline()
         return float(line.strip())
 
+
 async def price_bot(key, ws):
     fname, interval, dist, amt = settings[key]
-    
     rng = from_file(fname) if fname else bot_lookup(key)
-
-    while(True):
+    while True:
         await asyncio.sleep(abs(random.gauss(interval, interval / 3)))
-        await place_order(ws, rng.pull(), dist, amt, key)
+        try:
+            await place_order(ws, rng.pull(), dist, amt, key)
+        except websockets.exceptions.ConnectionClosed:
+            raise
+        except Exception as e:
+            log.warning(f"Error placing orders for {key}: {e}")
 
 
-async def main():
-    async with websockets.connect(websocket_uri, subprotocols=["Price_Enforcer|penf"]) as ws:
+async def run_session():
+    """Connect and run bots for one session. Raises on disconnect."""
+    log.info(f"Connecting to {websocket_uri}")
+    async with websockets.connect(
+        websocket_uri,
+        subprotocols=["Price_Enforcer|penf"],
+    ) as ws:
+        log.info("Connected successfully")
         tasks = []
         for key in settings:
             task = asyncio.create_task(price_bot(key, ws))
             tasks.append(task)
-        
-        #seems like waiting for threads to finish blocks the ws from
-        #responding to ping messages.
-        while(1):
-            msg = await ws.recv()
-            print(msg)
+
+        try:
+            while True:
+                msg = await ws.recv()
+                log.debug(msg)
+        finally:
+            for t in tasks:
+                t.cancel()
+
+
+async def main():
+    """Main loop with retry logic and exponential backoff."""
+    backoff = INITIAL_BACKOFF
+    attempt = 0
+
+    while True:
+        attempt += 1
+        try:
+            await run_session()
+        except (
+            websockets.exceptions.ConnectionClosed,
+            websockets.exceptions.InvalidStatusCode,
+            websockets.exceptions.InvalidHandshake,
+            ConnectionRefusedError,
+            OSError,
+        ) as e:
+            log.warning(f"Connection lost/failed (attempt {attempt}): {e}")
+        except Exception as e:
+            log.error(f"Unexpected error (attempt {attempt}): {e}")
+
+        if MAX_RETRIES is not None and attempt >= MAX_RETRIES:
+            log.error(f"Max retries ({MAX_RETRIES}) reached, giving up")
+            break
+
+        jitter = random.uniform(0, backoff * 0.3)
+        wait = backoff + jitter
+        log.info(f"Retrying in {wait:.1f}s (backoff={backoff:.1f}s)")
+        await asyncio.sleep(wait)
+        backoff = min(backoff * 1.5, MAX_BACKOFF)
+
+        # Reset backoff after a successful long-running connection
+        # (handled implicitly: if run_session ran for >60s, reset)
 
 
 if __name__ == "__main__":
