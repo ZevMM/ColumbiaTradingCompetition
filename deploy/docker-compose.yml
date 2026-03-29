@@ -11,6 +11,7 @@
 services:
   # Local dev — path-based routing, no auth, no SSL
   competition:
+    profiles: ["local"]
     build:
       context: ..
       dockerfile: deploy/Dockerfile

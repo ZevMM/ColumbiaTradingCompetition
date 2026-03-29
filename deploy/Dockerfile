@@ -71,7 +71,7 @@ ARG NGINX_CONF=deploy/nginx.local.conf
 COPY ${NGINX_CONF} /etc/nginx/nginx.conf
 
 # Create default htpasswd (change this!)
-RUN htpasswd -cb /etc/nginx/.htpasswd admin changeme
+RUN htpasswd -cb /etc/nginx/.htpasswd admin r85.jHpX7tYLmuUo0hazHjWz*
 
 # ── Volumes for runtime data ─────────────────────────────────────
 VOLUME ["/app/matching-engine/config.json", "/app/python_bots/data"]
