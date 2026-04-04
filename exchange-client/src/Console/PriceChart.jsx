@@ -146,7 +146,7 @@ const PriceChart = ({game, cur_ticker}) => {
         scrollZoom: true,
         responsive: true,
       }}
-      revision={revision.current}
+      revision={revision}
     />
   );
 };

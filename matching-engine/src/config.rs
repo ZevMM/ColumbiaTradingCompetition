@@ -20,7 +20,6 @@ static CONFIG: OnceLock<ExchangeConfig> = OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 struct RawConfig {
-    max_price_cents: usize,
     start_asset_balance: i64,
     start_cents_balance: usize,
     assets: Vec<RawAsset>,
@@ -45,7 +44,6 @@ pub struct ExchangeConfig {
     pub trader_passwords: Vec<[char; 4]>,
     pub start_cents_balance: usize,
     pub start_asset_balance: i64,
-    pub max_price_cents: usize,
     pub price_enforcer_id: TraderId,
 }
 
@@ -78,7 +76,6 @@ pub fn init_config(path: &str) {
         trader_passwords,
         start_cents_balance: raw.start_cents_balance,
         start_asset_balance: raw.start_asset_balance,
-        max_price_cents: raw.max_price_cents,
         price_enforcer_id: TraderId(price_enforcer_idx as u16),
     };
 
@@ -275,14 +272,7 @@ impl GlobalOrderBookState {
         let cfg = config();
         let books = TickerSymbol::all()
             .into_iter()
-            .map(|sym| {
-                Mutex::new(crate::orderbook::quickstart_order_book(
-                    sym,
-                    0,
-                    cfg.max_price_cents,
-                    10000,
-                ))
-            })
+            .map(|sym| Mutex::new(crate::orderbook::quickstart_order_book(sym)))
             .collect();
         Self { books }
     }

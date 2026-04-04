@@ -54,45 +54,46 @@ pub fn add_order<'a>(
 
     drop(trader_account);
 
-   // Check price level bounds
-   let orderbook = data.index_ref(&symbol).lock().unwrap();
-   let max_price = orderbook.buy_side_limit_levels.len();
-   if order_request_inner.price >= max_price {
+   if order_request_inner.price == 0 {
        return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
            side: order_request_inner.order_type,
            price: order_request_inner.price,
            symbol: order_request_inner.symbol,
-           error_details: "Price exceeds maximum allowed price"
+           error_details: "Price must be greater than zero"
        });
    }
 
    if order_request_inner.amount > 10_000 {
-    return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
-        side: order_request_inner.order_type,
-        price: order_request_inner.price,
-        symbol: order_request_inner.symbol,
-        error_details: "Volume exceeds maximum allowed single-order volume"
-    });
-   }
-
-   // Check limit level capacity based on order type
-   let level_orders = match order_request_inner.order_type {
-       OrderType::Buy => &orderbook.buy_side_limit_levels[order_request_inner.price].orders,
-       OrderType::Sell => &orderbook.sell_side_limit_levels[order_request_inner.price].orders,
-   };
-
-   // Compare against vector capacity
-   if level_orders.len() >= level_orders.capacity() {
        return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
            side: order_request_inner.order_type,
            price: order_request_inner.price,
            symbol: order_request_inner.symbol,
-           error_details: "Price level is at capacity"
+           error_details: "Volume exceeds maximum allowed single-order volume"
        });
    }
 
-   // Drop the orderbook lock before proceeding with existing logic
-   drop(orderbook);
+   // Check per-level order count
+   {
+       let orderbook = data.index_ref(&symbol).lock().unwrap();
+       let level_len = match order_request_inner.order_type {
+           OrderType::Buy => orderbook
+               .buy_side
+               .get(&order_request_inner.price)
+               .map_or(0, |q| q.len()),
+           OrderType::Sell => orderbook
+               .sell_side
+               .get(&order_request_inner.price)
+               .map_or(0, |q| q.len()),
+       };
+       if level_len >= 10_000 {
+           return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+               side: order_request_inner.order_type,
+               price: order_request_inner.price,
+               symbol: order_request_inner.symbol,
+               error_details: "Price level is at capacity"
+           });
+       }
+   }
 
 
     // Todo: refactor into match statement, put into actix guard?
@@ -165,9 +166,8 @@ pub fn add_order<'a>(
             order_request_inner.clone(),
             accounts_data,
             relay_server_addr,
-            order_counter,
             order_id,
-            start_time
+            start_time,
         );
 
     // very gross, should deal with
@@ -203,7 +203,6 @@ pub fn cancel_order<'a>(
         .unwrap()
         .handle_incoming_cancel_request(
             cancel_request_inner,
-            order_counter,
             relay_server_addr,
             accounts_data,
         );
