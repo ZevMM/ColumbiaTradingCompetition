@@ -34,28 +34,26 @@ function Console({ws, user, game, account}) {
   const sellSide = game[cur_ticker].sell_side;
 
   const buyPrices = Object.keys(buySide).map(Number).sort((a, b) => a - b);
-  const lowbuy = buyPrices.length > 0 ? buyPrices[0] : 0;
-  const highbuy = buyPrices.length > 0 ? buyPrices[buyPrices.length - 1] : 0;
-
   let cumsum_buy = [];
+  let buy_price_axis = [];
   if (buyPrices.length > 0) {
     let runsum = 0;
-    for (let p = highbuy; p >= Math.max(lowbuy - 1, 0); p--) {
-      runsum += buySide[p] || 0;
+    for (let i = buyPrices.length - 1; i >= 0; i--) {
+      runsum += buySide[buyPrices[i]];
       cumsum_buy.unshift(runsum);
+      buy_price_axis.unshift(buyPrices[i]);
     }
   }
 
   const sellPrices = Object.keys(sellSide).map(Number).sort((a, b) => a - b);
-  const lowsell = sellPrices.length > 0 ? sellPrices[0] : 0;
-  const highsell = sellPrices.length > 0 ? sellPrices[sellPrices.length - 1] : 0;
-
   let cumsum_sell = [];
+  let sell_price_axis = [];
   if (sellPrices.length > 0) {
     let runsum = 0;
-    for (let p = lowsell; p <= highsell + 1; p++) {
-      runsum += sellSide[p] || 0;
+    for (let i = 0; i < sellPrices.length; i++) {
+      runsum += sellSide[sellPrices[i]];
       cumsum_sell.push(runsum);
+      sell_price_axis.push(sellPrices[i]);
     }
   }
 
@@ -64,28 +62,26 @@ function Console({ws, user, game, account}) {
   const chartSellSide = chartGame[cur_ticker].sell_side;
 
   const chartBuyPrices = Object.keys(chartBuySide).map(Number).sort((a, b) => a - b);
-  const chartLowbuy = chartBuyPrices.length > 0 ? chartBuyPrices[0] : 0;
-  const chartHighbuy = chartBuyPrices.length > 0 ? chartBuyPrices[chartBuyPrices.length - 1] : 0;
-
   let chart_cumsum_buy = [];
+  let chart_buy_price_axis = [];
   if (chartBuyPrices.length > 0) {
     let runsum = 0;
-    for (let p = chartHighbuy; p >= Math.max(chartLowbuy - 1, 0); p--) {
-      runsum += chartBuySide[p] || 0;
+    for (let i = chartBuyPrices.length - 1; i >= 0; i--) {
+      runsum += chartBuySide[chartBuyPrices[i]];
       chart_cumsum_buy.unshift(runsum);
+      chart_buy_price_axis.unshift(chartBuyPrices[i]);
     }
   }
 
   const chartSellPrices = Object.keys(chartSellSide).map(Number).sort((a, b) => a - b);
-  const chartLowsell = chartSellPrices.length > 0 ? chartSellPrices[0] : 0;
-  const chartHighsell = chartSellPrices.length > 0 ? chartSellPrices[chartSellPrices.length - 1] : 0;
-
   let chart_cumsum_sell = [];
+  let chart_sell_price_axis = [];
   if (chartSellPrices.length > 0) {
     let runsum = 0;
-    for (let p = chartLowsell; p <= chartHighsell + 1; p++) {
-      runsum += chartSellSide[p] || 0;
+    for (let i = 0; i < chartSellPrices.length; i++) {
+      runsum += chartSellSide[chartSellPrices[i]];
       chart_cumsum_sell.push(runsum);
+      chart_sell_price_axis.push(chartSellPrices[i]);
     }
   }
 
@@ -113,11 +109,11 @@ function Console({ws, user, game, account}) {
             <PriceChart game={game} cur_ticker={cur_ticker} />
         </div>
         <div className="area-chart2 panel" style={{padding: 0}}>
-            <DepthChart buyside={chart_cumsum_buy} sellside={chart_cumsum_sell} lowsell={chartLowsell} lowbuy={chartLowbuy}/>
+            <DepthChart buyside={chart_cumsum_buy} sellside={chart_cumsum_sell} buyprices={chart_buy_price_axis} sellprices={chart_sell_price_axis}/>
         </div>
         <div className="area-book panel">
             <div className="panel-header">Order Book</div>
-            <OrderBook buyside={cumsum_buy} sellside={cumsum_sell} lowsell={lowsell} lowbuy={lowbuy}/>
+            <OrderBook buyside={cumsum_buy} sellside={cumsum_sell} buyprices={buy_price_axis} sellprices={sell_price_axis}/>
         </div>
     </div>
   )

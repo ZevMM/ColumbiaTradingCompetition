@@ -3,10 +3,20 @@ import createPlotlyComponent from 'react-plotly.js/factory';
 import { useState } from 'react';
 
 const Plot = createPlotlyComponent(Plotly);
-const DepthChart = ({buyside, sellside, lowsell, lowbuy}) => {
+const DISPLAY_MARGIN = 30;
 
-  const buyprices = buyside.map((_, i) => i + Math.max(lowbuy - 1, 0));
-  const sellprices = sellside.map((_, i) => i + lowsell);
+const DepthChart = ({buyside, sellside, buyprices, sellprices}) => {
+  const bestBid = buyprices.length > 0 ? buyprices[buyprices.length - 1] : null;
+  const bestAsk = sellprices.length > 0 ? sellprices[0] : null;
+
+  let xrange;
+  if (bestBid !== null && bestAsk !== null) {
+    xrange = [bestBid - DISPLAY_MARGIN, bestAsk + DISPLAY_MARGIN];
+  } else if (bestBid !== null) {
+    xrange = [bestBid - DISPLAY_MARGIN, bestBid + DISPLAY_MARGIN];
+  } else if (bestAsk !== null) {
+    xrange = [bestAsk - DISPLAY_MARGIN, bestAsk + DISPLAY_MARGIN];
+  }
 
   const layout = {
     xaxis: {
@@ -15,6 +25,7 @@ const DepthChart = ({buyside, sellside, lowsell, lowbuy}) => {
       gridcolor: '#1e2235',
       linecolor: '#2a2e3e',
       tickfont: { color: '#787b86', family: 'IBM Plex Mono', size: 10 },
+      ...(xrange && { range: xrange }),
     },
     yaxis: {
       title: { text: 'Volume', font: { color: '#787b86', family: 'IBM Plex Mono', size: 11 } },

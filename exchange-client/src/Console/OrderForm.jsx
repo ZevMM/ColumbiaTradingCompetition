@@ -35,7 +35,7 @@ function OrderForm({ws, user, all_tickers}) {
 
         <div className="field-group">
         <label htmlFor="price">Price <img src={token}/></label>
-        <input id="price" name="price" type="number" min="1" required/>
+        <input id="price" name="price" type="number" min="1" max="1000000" required/>
         </div>
 
         <div className="field-group">

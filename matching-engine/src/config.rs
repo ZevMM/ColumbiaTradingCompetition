@@ -20,6 +20,7 @@ static CONFIG: OnceLock<ExchangeConfig> = OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 struct RawConfig {
+    order_rate_limit_per_second: usize,
     start_asset_balance: i64,
     start_cents_balance: usize,
     assets: Vec<RawAsset>,
@@ -45,6 +46,7 @@ pub struct ExchangeConfig {
     pub start_cents_balance: usize,
     pub start_asset_balance: i64,
     pub price_enforcer_id: TraderId,
+    pub order_rate_limit_per_second: usize,
 }
 
 pub fn init_config(path: &str) {
@@ -77,6 +79,7 @@ pub fn init_config(path: &str) {
         start_cents_balance: raw.start_cents_balance,
         start_asset_balance: raw.start_asset_balance,
         price_enforcer_id: TraderId(price_enforcer_idx as u16),
+        order_rate_limit_per_second: raw.order_rate_limit_per_second,
     };
 
     CONFIG.set(cfg).expect("Config already initialised");

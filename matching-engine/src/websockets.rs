@@ -2,6 +2,7 @@ use actix::prelude::*;
 use actix_web::Error;
 use actix_web_actors::ws;
 use log::info;
+use std::collections::VecDeque;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -60,6 +61,24 @@ pub fn add_order<'a>(
            price: order_request_inner.price,
            symbol: order_request_inner.symbol,
            error_details: "Price must be greater than zero"
+       });
+   }
+
+   if order_request_inner.price > 1_000_000 {
+       return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+           side: order_request_inner.order_type,
+           price: order_request_inner.price,
+           symbol: order_request_inner.symbol,
+           error_details: "Price exceeds maximum allowed value"
+       });
+   }
+
+   if order_request_inner.amount == 0 {
+       return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+           side: order_request_inner.order_type,
+           price: order_request_inner.price,
+           symbol: order_request_inner.symbol,
+           error_details: "Amount must be greater than zero"
        });
    }
 
@@ -260,6 +279,7 @@ pub struct MyWebSocketActor {
     connection_ip: TraderIp,
     associated_id: TraderId,
     hb: Instant,
+    order_window: VecDeque<Instant>,
     global_state: web::Data<GlobalState>,
     start_time: web::Data<SystemTime>,
     relay_server_addr: web::Data<Addr<crate::connection_server::Server>>,
@@ -276,6 +296,20 @@ impl MyWebSocketActor {
             }
             ctx.ping(b"");
         });
+    }
+
+    fn check_rate_limit(&mut self) -> bool {
+        let now = Instant::now();
+        let limit = crate::config::config().order_rate_limit_per_second;
+        while self.order_window.front().map_or(false, |t| now.duration_since(*t) > Duration::from_secs(1)) {
+            self.order_window.pop_front();
+        }
+        if self.order_window.len() >= limit {
+            false
+        } else {
+            self.order_window.push_back(now);
+            true
+        }
     }
 }
 
@@ -373,6 +407,7 @@ pub async fn websocket(
             .unwrap(),
         associated_id: trader_id,
         hb: Instant::now(),
+        order_window: VecDeque::new(),
         global_state: state_data.clone(),
         start_time: start_time.clone(),
         relay_server_addr: relay_server_addr.clone(),
@@ -485,6 +520,21 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
 
                 match incoming_message {
                     IncomingMessage::OrderRequest(order_req) => {
+                        if order_req.trader_id != self.associated_id {
+                            ctx.text("{\"Error\" : \"TraderId does not match authenticated connection.\"}");
+                            return;
+                        }
+                        if !self.associated_id.is_price_enforcer() && !self.check_rate_limit() {
+                            ctx.text(serde_json::to_string(&OrderPlaceResponse::OrderPlaceErrorMessage(
+                                OrderPlaceErrorMessage {
+                                    side: order_req.order_type,
+                                    price: order_req.price,
+                                    symbol: order_req.symbol,
+                                    error_details: "Rate limit exceeded",
+                                }
+                            )).unwrap());
+                            return;
+                        }
                         let password_needed = self
                             .global_state
                             .global_account_state
@@ -518,6 +568,22 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                         }
                     }
                     IncomingMessage::CancelRequest(cancel_req) => {
+                        if cancel_req.trader_id != self.associated_id {
+                            ctx.text("{\"Error\" : \"TraderId does not match authenticated connection.\"}");
+                            return;
+                        }
+                        if !self.associated_id.is_price_enforcer() && !self.check_rate_limit() {
+                            ctx.text(serde_json::to_string(&crate::api_messages::OrderCancelResponse::CancelErrorMessage(
+                                CancelErrorMessage {
+                                    order_id: cancel_req.order_id,
+                                    side: cancel_req.side,
+                                    price: cancel_req.price,
+                                    symbol: cancel_req.symbol,
+                                    error_details: "Rate limit exceeded",
+                                }
+                            )).unwrap());
+                            return;
+                        }
                         let password_needed = self
                             .global_state
                             .global_account_state
