@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Tickers from './Tickers';
 import OrderBook from './OrderBook';
 import PriceChart from './PriceChart';
@@ -7,30 +7,83 @@ import OrderForm from './OrderForm';
 import Portfolio from './Portfolio';
 import StatsBar from './StatsBar';
 
+const DEPTH_CHART_FPS = 10;
+
 function Console({ws, user, game, account}) {
   if (!game || !account) { return <div>Loading...</div> }
 
   const [cur_ticker, setCur_ticker] = useState(Object.keys(game)[0]);
   const all_tickers = Object.keys(game);
-  const maxprice = game[all_tickers[0]].buy_side_limit_levels.length - 1;
 
-  let cumsum_buy = []
-  let lowbuy = game[cur_ticker].buy_side_limit_levels.findIndex((e) => e.total_volume > 0)
-  let highbuy = game[cur_ticker].buy_side_limit_levels.findLastIndex((e) => e.total_volume > 0)
-  game[cur_ticker].buy_side_limit_levels.slice(lowbuy, highbuy+1).reduceRight((s,c) => {
-    let cs = s + c.total_volume
-    cumsum_buy.unshift(cs)
-    return cs
-  }, 0)
+  // Throttled game snapshot used only by the Plotly depth chart.
+  // Text-based components (OrderBook, StatsBar) use `game` directly at full speed.
+  const [chartGame, setChartGame] = useState(game);
+  const pendingGame = useRef(game);
+  useEffect(() => {
+    pendingGame.current = game;
+  }, [game]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setChartGame(pendingGame.current);
+    }, 1000 / DEPTH_CHART_FPS);
+    return () => clearInterval(id);
+  }, []);
 
-  let cumsum_sell = []
-  let lowsell = game[cur_ticker].sell_side_limit_levels.findIndex((e) => e.total_volume > 0)
-  let highsell = game[cur_ticker].sell_side_limit_levels.findLastIndex((e) => e.total_volume > 0)
-  game[cur_ticker].sell_side_limit_levels.slice(lowsell, highsell+2).reduce((s,c) => {
-    let cs = s + c.total_volume
-    cumsum_sell.push(cs)
-    return cs
-  }, 0)
+  // Order book text display — uses live `game` at full speed (cheap renders)
+  const buySide = game[cur_ticker].buy_side;
+  const sellSide = game[cur_ticker].sell_side;
+
+  const buyPrices = Object.keys(buySide).map(Number).sort((a, b) => a - b);
+  let cumsum_buy = [];
+  let buy_price_axis = [];
+  if (buyPrices.length > 0) {
+    let runsum = 0;
+    for (let i = buyPrices.length - 1; i >= 0; i--) {
+      runsum += buySide[buyPrices[i]];
+      cumsum_buy.unshift(runsum);
+      buy_price_axis.unshift(buyPrices[i]);
+    }
+  }
+
+  const sellPrices = Object.keys(sellSide).map(Number).sort((a, b) => a - b);
+  let cumsum_sell = [];
+  let sell_price_axis = [];
+  if (sellPrices.length > 0) {
+    let runsum = 0;
+    for (let i = 0; i < sellPrices.length; i++) {
+      runsum += sellSide[sellPrices[i]];
+      cumsum_sell.push(runsum);
+      sell_price_axis.push(sellPrices[i]);
+    }
+  }
+
+  // Depth chart — uses throttled `chartGame` to cap Plotly re-renders at DEPTH_CHART_FPS
+  const chartBuySide = chartGame[cur_ticker].buy_side;
+  const chartSellSide = chartGame[cur_ticker].sell_side;
+
+  const chartBuyPrices = Object.keys(chartBuySide).map(Number).sort((a, b) => a - b);
+  let chart_cumsum_buy = [];
+  let chart_buy_price_axis = [];
+  if (chartBuyPrices.length > 0) {
+    let runsum = 0;
+    for (let i = chartBuyPrices.length - 1; i >= 0; i--) {
+      runsum += chartBuySide[chartBuyPrices[i]];
+      chart_cumsum_buy.unshift(runsum);
+      chart_buy_price_axis.unshift(chartBuyPrices[i]);
+    }
+  }
+
+  const chartSellPrices = Object.keys(chartSellSide).map(Number).sort((a, b) => a - b);
+  let chart_cumsum_sell = [];
+  let chart_sell_price_axis = [];
+  if (chartSellPrices.length > 0) {
+    let runsum = 0;
+    for (let i = 0; i < chartSellPrices.length; i++) {
+      runsum += chartSellSide[chartSellPrices[i]];
+      chart_cumsum_sell.push(runsum);
+      chart_sell_price_axis.push(chartSellPrices[i]);
+    }
+  }
 
 
 
@@ -41,7 +94,7 @@ function Console({ws, user, game, account}) {
         </div>
         <div className="area-order panel">
             <div className="panel-header">Order Entry</div>
-            <OrderForm ws={ws} user={user} all_tickers={all_tickers} maxprice={maxprice}/>
+            <OrderForm ws={ws} user={user} all_tickers={all_tickers}/>
         </div>
         <div className="area-tickers panel">
             <div className="panel-header">Markets</div>
@@ -56,11 +109,11 @@ function Console({ws, user, game, account}) {
             <PriceChart game={game} cur_ticker={cur_ticker} />
         </div>
         <div className="area-chart2 panel" style={{padding: 0}}>
-            <DepthChart buyside={cumsum_buy} sellside={cumsum_sell} lowsell={lowsell} lowbuy={lowbuy}/>
+            <DepthChart buyside={chart_cumsum_buy} sellside={chart_cumsum_sell} buyprices={chart_buy_price_axis} sellprices={chart_sell_price_axis}/>
         </div>
         <div className="area-book panel">
             <div className="panel-header">Order Book</div>
-            <OrderBook buyside={cumsum_buy} sellside={cumsum_sell} lowsell={lowsell} lowbuy={lowbuy}/>
+            <OrderBook buyside={cumsum_buy} sellside={cumsum_sell} buyprices={buy_price_axis} sellprices={sell_price_axis}/>
         </div>
     </div>
   )

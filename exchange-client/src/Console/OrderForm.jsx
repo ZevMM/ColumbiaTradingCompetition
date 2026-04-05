@@ -17,7 +17,7 @@ let placeOrder = (e, side, user, ws) => {
     ws.send(JSON.stringify(message))
 }
 
-function OrderForm({ws, user, all_tickers, maxprice}) {
+function OrderForm({ws, user, all_tickers}) {
     let side;
     return (
     <form className="order-form"
@@ -35,7 +35,7 @@ function OrderForm({ws, user, all_tickers, maxprice}) {
 
         <div className="field-group">
         <label htmlFor="price">Price <img src={token}/></label>
-        <input id="price" name="price" type="number" min="0" max={maxprice} required/>
+        <input id="price" name="price" type="number" min="1" max="1000000" required/>
         </div>
 
         <div className="field-group">

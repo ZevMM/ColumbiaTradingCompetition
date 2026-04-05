@@ -2,6 +2,7 @@ use actix::prelude::*;
 use actix_web::Error;
 use actix_web_actors::ws;
 use log::info;
+use std::collections::VecDeque;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -54,45 +55,64 @@ pub fn add_order<'a>(
 
     drop(trader_account);
 
-   // Check price level bounds
-   let orderbook = data.index_ref(&symbol).lock().unwrap();
-   let max_price = orderbook.buy_side_limit_levels.len();
-   if order_request_inner.price >= max_price {
+   if order_request_inner.price == 0 {
        return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
            side: order_request_inner.order_type,
            price: order_request_inner.price,
            symbol: order_request_inner.symbol,
-           error_details: "Price exceeds maximum allowed price"
+           error_details: "Price must be greater than zero"
+       });
+   }
+
+   if order_request_inner.price > 1_000_000 {
+       return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+           side: order_request_inner.order_type,
+           price: order_request_inner.price,
+           symbol: order_request_inner.symbol,
+           error_details: "Price exceeds maximum allowed value"
+       });
+   }
+
+   if order_request_inner.amount == 0 {
+       return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+           side: order_request_inner.order_type,
+           price: order_request_inner.price,
+           symbol: order_request_inner.symbol,
+           error_details: "Amount must be greater than zero"
        });
    }
 
    if order_request_inner.amount > 10_000 {
-    return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
-        side: order_request_inner.order_type,
-        price: order_request_inner.price,
-        symbol: order_request_inner.symbol,
-        error_details: "Volume exceeds maximum allowed single-order volume"
-    });
-   }
-
-   // Check limit level capacity based on order type
-   let level_orders = match order_request_inner.order_type {
-       OrderType::Buy => &orderbook.buy_side_limit_levels[order_request_inner.price].orders,
-       OrderType::Sell => &orderbook.sell_side_limit_levels[order_request_inner.price].orders,
-   };
-
-   // Compare against vector capacity
-   if level_orders.len() >= level_orders.capacity() {
        return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
            side: order_request_inner.order_type,
            price: order_request_inner.price,
            symbol: order_request_inner.symbol,
-           error_details: "Price level is at capacity"
+           error_details: "Volume exceeds maximum allowed single-order volume"
        });
    }
 
-   // Drop the orderbook lock before proceeding with existing logic
-   drop(orderbook);
+   // Check per-level order count
+   {
+       let orderbook = data.index_ref(&symbol).lock().unwrap();
+       let level_len = match order_request_inner.order_type {
+           OrderType::Buy => orderbook
+               .buy_side
+               .get(&order_request_inner.price)
+               .map_or(0, |q| q.len()),
+           OrderType::Sell => orderbook
+               .sell_side
+               .get(&order_request_inner.price)
+               .map_or(0, |q| q.len()),
+       };
+       if level_len >= 10_000 {
+           return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
+               side: order_request_inner.order_type,
+               price: order_request_inner.price,
+               symbol: order_request_inner.symbol,
+               error_details: "Price level is at capacity"
+           });
+       }
+   }
 
 
     // Todo: refactor into match statement, put into actix guard?
@@ -165,9 +185,8 @@ pub fn add_order<'a>(
             order_request_inner.clone(),
             accounts_data,
             relay_server_addr,
-            order_counter,
             order_id,
-            start_time
+            start_time,
         );
 
     // very gross, should deal with
@@ -203,7 +222,6 @@ pub fn cancel_order<'a>(
         .unwrap()
         .handle_incoming_cancel_request(
             cancel_request_inner,
-            order_counter,
             relay_server_addr,
             accounts_data,
         );
@@ -261,6 +279,7 @@ pub struct MyWebSocketActor {
     connection_ip: TraderIp,
     associated_id: TraderId,
     hb: Instant,
+    order_window: VecDeque<Instant>,
     global_state: web::Data<GlobalState>,
     start_time: web::Data<SystemTime>,
     relay_server_addr: web::Data<Addr<crate::connection_server::Server>>,
@@ -277,6 +296,20 @@ impl MyWebSocketActor {
             }
             ctx.ping(b"");
         });
+    }
+
+    fn check_rate_limit(&mut self) -> bool {
+        let now = Instant::now();
+        let limit = crate::config::config().order_rate_limit_per_second;
+        while self.order_window.front().map_or(false, |t| now.duration_since(*t) > Duration::from_secs(1)) {
+            self.order_window.pop_front();
+        }
+        if self.order_window.len() >= limit {
+            false
+        } else {
+            self.order_window.push_back(now);
+            true
+        }
     }
 }
 
@@ -374,6 +407,7 @@ pub async fn websocket(
             .unwrap(),
         associated_id: trader_id,
         hb: Instant::now(),
+        order_window: VecDeque::new(),
         global_state: state_data.clone(),
         start_time: start_time.clone(),
         relay_server_addr: relay_server_addr.clone(),
@@ -486,6 +520,21 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
 
                 match incoming_message {
                     IncomingMessage::OrderRequest(order_req) => {
+                        if order_req.trader_id != self.associated_id {
+                            ctx.text("{\"Error\" : \"TraderId does not match authenticated connection.\"}");
+                            return;
+                        }
+                        if !self.associated_id.is_price_enforcer() && !self.check_rate_limit() {
+                            ctx.text(serde_json::to_string(&OrderPlaceResponse::OrderPlaceErrorMessage(
+                                OrderPlaceErrorMessage {
+                                    side: order_req.order_type,
+                                    price: order_req.price,
+                                    symbol: order_req.symbol,
+                                    error_details: "Rate limit exceeded",
+                                }
+                            )).unwrap());
+                            return;
+                        }
                         let password_needed = self
                             .global_state
                             .global_account_state
@@ -519,6 +568,22 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                         }
                     }
                     IncomingMessage::CancelRequest(cancel_req) => {
+                        if cancel_req.trader_id != self.associated_id {
+                            ctx.text("{\"Error\" : \"TraderId does not match authenticated connection.\"}");
+                            return;
+                        }
+                        if !self.associated_id.is_price_enforcer() && !self.check_rate_limit() {
+                            ctx.text(serde_json::to_string(&crate::api_messages::OrderCancelResponse::CancelErrorMessage(
+                                CancelErrorMessage {
+                                    order_id: cancel_req.order_id,
+                                    side: cancel_req.side,
+                                    price: cancel_req.price,
+                                    symbol: cancel_req.symbol,
+                                    error_details: "Rate limit exceeded",
+                                }
+                            )).unwrap());
+                            return;
+                        }
                         let password_needed = self
                             .global_state
                             .global_account_state

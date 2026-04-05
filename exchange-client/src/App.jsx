@@ -72,28 +72,28 @@ function App() {
               let {amount, symbol, resting_side, price, time} = body
               setGame(prevGame => {
                 let newgame = {...prevGame}
-                newgame[symbol][
-                    resting_side == "Buy" ?
-                    'buy_side_limit_levels' :
-                    'sell_side_limit_levels'
-                ][price].total_volume -= amount;
+                const sideKey = resting_side == "Buy" ? 'buy_side' : 'sell_side'
+                const cur = newgame[symbol][sideKey][price] || 0
+                if (cur - amount <= 0) {
+                  delete newgame[symbol][sideKey][price]
+                } else {
+                  newgame[symbol][sideKey][price] = cur - amount
+                }
                 newgame[symbol].price_history.push([time, price, amount])
                 return newgame
               });
               break;
             }
-            case "NewRestingOrderMessage":
+            case "NewRestingOrderMessage": {
               let {side, amount, symbol, price} = body
               setGame(prevGame => {
                 let newgame = {...prevGame}
-                newgame[symbol][
-                    side == "Buy" ?
-                    'buy_side_limit_levels' :
-                    'sell_side_limit_levels'
-                ][price].total_volume += amount;
+                const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
+                newgame[symbol][sideKey][price] = (newgame[symbol][sideKey][price] || 0) + amount
                 return newgame
               });
               break;
+            }
             case "OrderPlaceErrorMessage":
               setErr(body.error_details)
               break;
@@ -195,11 +195,13 @@ function App() {
               let {symbol, price, side, amount} = body
               setGame(prevGame => {
                 let newgame = {...prevGame}
-                newgame[symbol][
-                    side == "Buy" ?
-                    'buy_side_limit_levels' :
-                    'sell_side_limit_levels'
-                ][price].total_volume -= amount
+                const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
+                const cur = newgame[symbol][sideKey][price] || 0
+                if (cur - amount <= 0) {
+                  delete newgame[symbol][sideKey][price]
+                } else {
+                  newgame[symbol][sideKey][price] = cur - amount
+                }
                 return newgame
               });
               break;
