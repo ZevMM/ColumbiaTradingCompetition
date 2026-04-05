@@ -9,7 +9,7 @@ function OrderBook({buyside, sellside, lowsell, lowbuy}) {
                         l > 0 ?
                         <div key={i} className="book-row buy-row"
                             style={{background: `linear-gradient(to right, rgba(38, 166, 154, 0.25) ${l * 100 / buyside[0]}%, transparent ${l * 100 / buyside[0]}%)`}}>
-                           <div>{i + Math.max(lowbuy -1 , 0)}</div><div>{l}</div>
+                           <div>{i + lowbuy}</div><div>{l}</div>
                         </div>
                         : null
                     ))}

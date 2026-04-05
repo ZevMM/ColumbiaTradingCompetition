@@ -17,7 +17,7 @@ function Console({ws, user, game, account}) {
   let cumsum_buy = []
   let lowbuy = game[cur_ticker].buy_side_limit_levels.findIndex((e) => e.total_volume > 0)
   let highbuy = game[cur_ticker].buy_side_limit_levels.findLastIndex((e) => e.total_volume > 0)
-  game[cur_ticker].buy_side_limit_levels.slice(Math.max(lowbuy - 1, 0), highbuy + 1).reduceRight((s,c) => {
+  game[cur_ticker].buy_side_limit_levels.slice(lowbuy, highbuy+1).reduceRight((s,c) => {
     let cs = s + c.total_volume
     cumsum_buy.unshift(cs)
     return cs
