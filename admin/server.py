@@ -208,6 +208,11 @@ async def api_tally_score(request):
 async def api_server_status(request):
     """Get status of all managed processes."""
     output = _supervisorctl("status", "all")
+
+    # Detect error messages (e.g. supervisorctl not found)
+    if "not found" in output or "refused" in output or "no such file" in output.lower():
+        return web.json_response({"ok": False, "error": output, "processes": {}})
+
     lines = [l.strip() for l in output.splitlines() if l.strip()]
     processes = {}
     for line in lines:

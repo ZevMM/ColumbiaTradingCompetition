@@ -263,18 +263,23 @@ async function tallyScore() {
 async function refreshStatus() {
   const result = await api('GET', '/api/status');
   const el = document.getElementById('process-status');
-  if (result.ok) {
+  const botEl = document.getElementById('bot-status');
+
+  if (result.ok && Object.keys(result.processes).length > 0) {
     let html = '';
     for (const [name, status] of Object.entries(result.processes)) {
       const cls = status === 'RUNNING' ? 'running' : 'stopped';
       html += `<div style="margin:4px 0">${name} <span class="status-badge ${cls}">${status}</span></div>`;
     }
     el.innerHTML = html;
-    // Update bot status badge
-    const botEl = document.getElementById('bot-status');
     const botStatus = result.processes['price-enforcer'] || 'UNKNOWN';
     botEl.textContent = botStatus;
     botEl.className = 'status-badge ' + (botStatus === 'RUNNING' ? 'running' : 'stopped');
+  } else {
+    const errMsg = result.error || 'Could not reach process manager';
+    el.innerHTML = `<div style="color:#f66;font-size:0.85rem">${errMsg}</div>`;
+    botEl.textContent = 'UNAVAILABLE';
+    botEl.className = 'status-badge stopped';
   }
 }
 

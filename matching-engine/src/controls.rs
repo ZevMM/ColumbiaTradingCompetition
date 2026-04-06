@@ -79,6 +79,12 @@ pub async fn tally_score(global_state: web::Data<GlobalState>) -> Result<HttpRes
     for trader_id in config::TraderId::all() {
         if !trader_id.is_price_enforcer() {
             let account = accounts.index_ref(trader_id).lock().unwrap();
+
+            // Only include traders that are currently connected
+            if account.current_actor.is_none() {
+                continue;
+            }
+
             let mut total_value = account.cents_balance;
 
             for (symbol, price) in &final_prices {
