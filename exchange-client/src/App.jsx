@@ -31,7 +31,7 @@ function App() {
           console.error("WebSocket error:", error);
           setUser(null);
           setWs(null);
-          setErr("Error connecting to server (check username and password)");
+          setErr("Connection failed — check username/password, or try again in a few seconds");
           setState(0);
         };
         newws.onopen = () => {
