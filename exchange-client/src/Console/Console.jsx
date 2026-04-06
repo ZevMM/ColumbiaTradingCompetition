@@ -61,29 +61,11 @@ function Console({ws, user, game, account}) {
   const chartBuySide = chartGame[cur_ticker].buy_side;
   const chartSellSide = chartGame[cur_ticker].sell_side;
 
-  const chartBuyPrices = Object.keys(chartBuySide).map(Number).sort((a, b) => a - b);
-  let chart_cumsum_buy = [];
-  let chart_buy_price_axis = [];
-  if (chartBuyPrices.length > 0) {
-    let runsum = 0;
-    for (let i = chartBuyPrices.length - 1; i >= 0; i--) {
-      runsum += chartBuySide[chartBuyPrices[i]];
-      chart_cumsum_buy.unshift(runsum);
-      chart_buy_price_axis.unshift(chartBuyPrices[i]);
-    }
-  }
+  const chart_buy_price_axis = Object.keys(chartBuySide).map(Number).sort((a, b) => a - b);
+  const chart_buy_volumes = chart_buy_price_axis.map(p => chartBuySide[p]);
 
-  const chartSellPrices = Object.keys(chartSellSide).map(Number).sort((a, b) => a - b);
-  let chart_cumsum_sell = [];
-  let chart_sell_price_axis = [];
-  if (chartSellPrices.length > 0) {
-    let runsum = 0;
-    for (let i = 0; i < chartSellPrices.length; i++) {
-      runsum += chartSellSide[chartSellPrices[i]];
-      chart_cumsum_sell.push(runsum);
-      chart_sell_price_axis.push(chartSellPrices[i]);
-    }
-  }
+  const chart_sell_price_axis = Object.keys(chartSellSide).map(Number).sort((a, b) => a - b);
+  const chart_sell_volumes = chart_sell_price_axis.map(p => chartSellSide[p]);
 
 
 
@@ -109,7 +91,7 @@ function Console({ws, user, game, account}) {
             <PriceChart game={game} cur_ticker={cur_ticker} />
         </div>
         <div className="area-chart2 panel" style={{padding: 0}}>
-            <DepthChart buyside={chart_cumsum_buy} sellside={chart_cumsum_sell} buyprices={chart_buy_price_axis} sellprices={chart_sell_price_axis}/>
+            <DepthChart buyside={chart_buy_volumes} sellside={chart_sell_volumes} buyprices={chart_buy_price_axis} sellprices={chart_sell_price_axis}/>
         </div>
         <div className="area-book panel">
             <div className="panel-header">Order Book</div>
