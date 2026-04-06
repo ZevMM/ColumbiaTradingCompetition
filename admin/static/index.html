@@ -272,7 +272,7 @@ async function refreshStatus() {
       html += `<div style="margin:4px 0">${name} <span class="status-badge ${cls}">${status}</span></div>`;
     }
     el.innerHTML = html;
-    const botStatus = result.processes['price-enforcer'] || 'UNKNOWN';
+    const botStatus = result.processes['price-enforcer'] || 'NOT FOUND';
     botEl.textContent = botStatus;
     botEl.className = 'status-badge ' + (botStatus === 'RUNNING' ? 'running' : 'stopped');
   } else {

@@ -35,6 +35,8 @@ services:
       - "9090"
     environment:
       - MATCHING_ENGINE_URL=http://matching-engine:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - matching-engine
 
