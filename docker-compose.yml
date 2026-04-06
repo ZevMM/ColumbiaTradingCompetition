@@ -26,8 +26,15 @@ services:
     build: ./timer
     expose:
       - "3000"
+    depends_on:
+      - matching-engine
+
+  admin:
+    build: ./admin
+    expose:
+      - "9090"
     environment:
-      - VITE_SERVER_URL=http://matching-engine:8080
+      - MATCHING_ENGINE_URL=http://matching-engine:8080
     depends_on:
       - matching-engine
 
@@ -43,6 +50,7 @@ services:
       - matching-engine
       - exchange-client
       - timer
+      - admin
 
   price-enforcer:
     build: ./python_bots
