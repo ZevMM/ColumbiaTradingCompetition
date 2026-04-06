@@ -9,8 +9,8 @@ use std::time::{Duration, Instant, SystemTime};
 
 use actix_broker::BrokerSubscribe;
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(4);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
 use crate::api_messages::{
     self, CancelConfirmMessage, CancelErrorMessage, CancelRequest, IncomingMessage,
     OrderConfirmMessage, OrderPlaceErrorMessage, OrderPlaceResponse,
