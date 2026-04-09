@@ -15,12 +15,13 @@ def calculate_average_pixel_value(image_path):
 class TS:
     def __init__(self):
         self.hist = []
-        driver = webdriver.Edge()
+        driver = webdriver.Chrome()
         driver.get("https://www.earthcam.com/usa/newyork/timessquare/?cam=tsrobo1")
         self.livestream = driver.find_element(By.ID,value= 'videoPlayer_html5_api')
 
     def pull(self):
         self.livestream.screenshot("timessquare.png")
+        return calculate_average_pixel_value("timessquare.png")
         avg = calculate_average_pixel_value("timessquare.png")
         self.hist.append(avg)
         runavg = sum(self.hist) / len(self.hist)
@@ -28,7 +29,7 @@ class TS:
 
 if __name__ == "__main__":
     generator = TS()
-    f = open('TS_round1', 'w+')
+    f = open('TS_raw', 'w+')
     for i in range(100):
         f.write(str(generator.pull()) + "\n")
         f.flush()
