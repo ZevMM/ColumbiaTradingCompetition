@@ -35,8 +35,10 @@ services:
       - "9090"
     environment:
       - MATCHING_ENGINE_URL=http://matching-engine:8080
+      - DATA_DIR=/app/data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - bot-data:/app/data
     depends_on:
       - matching-engine
 
@@ -59,8 +61,11 @@ services:
     environment:
       - WS_URI=ws://matching-engine:8080/orders/ws
     volumes:
-      - ./python_bots/data:/app/data:ro
+      - bot-data:/app/data:ro
     depends_on:
       matching-engine:
         condition: service_healthy
     restart: on-failure
+
+volumes:
+  bot-data:

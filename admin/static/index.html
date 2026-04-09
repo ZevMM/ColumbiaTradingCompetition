@@ -145,9 +145,10 @@
   <!-- Data Upload -->
   <div class="card">
     <h2>Upload Price Data</h2>
-    <p style="font-size:0.8rem;color:#777;margin-bottom:8px;">Upload price data files for the bots (requires bot restart)</p>
-    <input type="file" id="data-files" multiple>
-    <button onclick="uploadData()">Upload</button>
+    <p style="font-size:0.8rem;color:#777;margin-bottom:8px;">Upload price data for each asset (one price per line, requires bot restart)</p>
+    <div style="margin:8px 0"><label style="display:inline-block;width:30px;font-weight:600;color:#8899bb;">AD</label> <input type="file" id="data-AD"> <button onclick="uploadAsset('AD')">Upload</button></div>
+    <div style="margin:8px 0"><label style="display:inline-block;width:30px;font-weight:600;color:#8899bb;">TS</label> <input type="file" id="data-TS"> <button onclick="uploadAsset('TS')">Upload</button></div>
+    <div style="margin:8px 0"><label style="display:inline-block;width:30px;font-weight:600;color:#8899bb;">TT</label> <input type="file" id="data-TT"> <button onclick="uploadAsset('TT')">Upload</button></div>
   </div>
 </div>
 
@@ -329,14 +330,14 @@ async function uploadConfig() {
   if (r.ok) log('Config uploaded. Restart server to apply.', 'success');
 }
 
-async function uploadData() {
-  const files = document.getElementById('data-files').files;
-  if (!files.length) { log('No files selected', 'error'); return; }
+async function uploadAsset(asset) {
+  const file = document.getElementById(`data-${asset}`).files[0];
+  if (!file) { log(`No file selected for ${asset}`, 'error'); return; }
   const fd = new FormData();
-  for (const f of files) fd.append('files', f);
-  log(`Uploading ${files.length} data file(s)...`);
-  const r = await api('POST', '/api/upload/data', fd);
-  if (r.ok) log(`Uploaded: ${r.files.join(', ')}. Restart bot to apply.`, 'success');
+  fd.append('file', file);
+  log(`Uploading ${asset} price data...`);
+  const r = await api('POST', `/api/upload/data/${asset}`, fd);
+  if (r.ok) log(`${asset} data uploaded. Restart bot to apply.`, 'success');
 }
 
 async function viewConfig() {

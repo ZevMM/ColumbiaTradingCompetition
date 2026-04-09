@@ -350,28 +350,25 @@ async def api_upload_config(request):
     return web.json_response({"ok": True, "message": f"Config uploaded to {CONFIG_PATH}"})
 
 
+VALID_ASSETS = {"AD", "TS", "TT"}
+
+
 async def api_upload_data(request):
-    """Upload price data files for the bots."""
+    """Upload price data file for a specific asset."""
+    asset = request.match_info["asset"]
+    if asset not in VALID_ASSETS:
+        return web.json_response({"ok": False, "error": f"Invalid asset: {asset}"}, status=400)
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     reader = await request.multipart()
-    uploaded = []
-    while True:
-        field = await reader.next()
-        if field is None:
-            break
-        filename = field.filename
-        if not filename:
-            continue
-        # Sanitize filename
-        safe_name = Path(filename).name
-        dest = DATA_DIR / safe_name
-        data = await field.read(decode=False)
-        dest.write_bytes(data)
-        uploaded.append(safe_name)
+    field = await reader.next()
+    if field is None:
+        return web.json_response({"ok": False, "error": "No file uploaded"}, status=400)
 
-    if not uploaded:
-        return web.json_response({"ok": False, "error": "No files uploaded"}, status=400)
-    return web.json_response({"ok": True, "files": uploaded})
+    data = await field.read(decode=False)
+    dest = DATA_DIR / f"{asset}_data"
+    dest.write_bytes(data)
+    return web.json_response({"ok": True, "asset": asset, "file": dest.name})
 
 
 async def api_get_config(request):
@@ -427,7 +424,7 @@ def create_app():
     app.router.add_post("/api/stop-bot", api_stop_bot)
     app.router.add_post("/api/restart-bot", api_restart_bot)
     app.router.add_post("/api/upload/config", api_upload_config)
-    app.router.add_post("/api/upload/data", api_upload_data)
+    app.router.add_post("/api/upload/data/{asset}", api_upload_data)
     app.router.add_get("/api/config", api_get_config)
     app.router.add_get("/api/health", api_health)
 
