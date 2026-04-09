@@ -15,7 +15,6 @@ log = logging.getLogger("MarketMaker")
 
 websocket_uri = os.environ.get("WS_URI", "ws://localhost:8080/orders/ws")
 MIN_PRICE = int(os.environ.get("MIN_PRICE", "1"))
-MAX_PRICE = int(os.environ.get("MAX_PRICE", "100"))
 
 # {symbol: [filename, avg frequency (s), dist, amt (total shares?)]}
 settings = {
@@ -59,7 +58,7 @@ def gen_dist(dist, amt):
 async def place_order(ws, price, dist, amt, symbol):
     price = int(price)
     for i in range(0, 15):
-        p = max(min(price - 3 + i, MAX_PRICE), MIN_PRICE)
+        p = max(price - 3 + i, MIN_PRICE)
         jsonreq = {
             'MessageType': "OrderRequest",
             'OrderType': "Sell",
@@ -73,7 +72,7 @@ async def place_order(ws, price, dist, amt, symbol):
         await asyncio.sleep(0.25)
 
     for i in range(0, 15):
-        p = max(min(price + i - 10, MAX_PRICE), MIN_PRICE)
+        p = max(price + i - 10, MIN_PRICE)
         jsonreq = {
             'MessageType': "OrderRequest",
             'OrderType': "Buy",
