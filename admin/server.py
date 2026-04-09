@@ -352,6 +352,7 @@ async def api_upload_config(request):
 
 async def api_upload_data(request):
     """Upload price data files for the bots."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     reader = await request.multipart()
     uploaded = []
     while True:
