@@ -8,7 +8,7 @@ import random
 
 class TT:
     def __init__(self):
-        self.driver = webdriver.Edge()
+        self.driver = webdriver.Chrome()
         self.driver.get("https://realtimerail.nyc/stops/117")
         self.hist = []
 
@@ -19,6 +19,9 @@ class TT:
         for n in range(len(times)):
             myl.append(int("0" + "".join \
                 ([s for s in times[n].text if s.isdigit()])))
+        self.driver.refresh()
+        print(myl)
+        return sum(myl)
         avg = sum(myl) / len(myl)
         self.hist.append(avg)
         runavg = sum(self.hist) / len(self.hist)
@@ -30,7 +33,7 @@ class TT:
 if __name__ == "__main__":
     generator = TT()
     time.sleep(5)
-    f = open('TT_round2', 'w+')
+    f = open('TT_raw', 'w+')
     for i in range(70):
         f.write(str(generator.pull()) + "\n")
         f.flush()
