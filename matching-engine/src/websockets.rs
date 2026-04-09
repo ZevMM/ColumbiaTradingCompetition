@@ -9,8 +9,8 @@ use std::time::{Duration, Instant, SystemTime};
 
 use actix_broker::BrokerSubscribe;
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(4);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
 use crate::api_messages::{
     self, CancelConfirmMessage, CancelErrorMessage, CancelRequest, IncomingMessage,
     OrderConfirmMessage, OrderPlaceErrorMessage, OrderPlaceResponse,
@@ -384,16 +384,19 @@ pub async fn websocket(
 
     println!("Trader with id {:?} connected.", trader_id);
     
-    let curr_actor = &mut state_data
-        .global_account_state
-        .index_ref(trader_id)
-        .lock()
-        .unwrap()
-        .current_actor;
+    // If trader already has a connection, clear the old one and allow reconnection.
+    // The old actor will stop on its own when its heartbeat times out.
+    {
+        let mut account = state_data
+            .global_account_state
+            .index_ref(trader_id)
+            .lock()
+            .unwrap();
 
-    if let Some(_) = curr_actor {
-        println!("Trader_id already has websocket connected");
-        return Ok(HttpResponse::Unauthorized().body("Invalid credentials"));
+        if account.current_actor.is_some() {
+            warn!("Trader {:?} reconnecting — clearing stale connection", trader_id);
+            account.current_actor = None;
+        }
     }
     
 

@@ -4,13 +4,12 @@ Provides:
   - Web UI for managing the competition
   - WebSocket broadcast for timer synchronization
   - API endpoints for server/bot control, scoring, file uploads
-  - Supervisord integration for process management
+  - Docker API integration for process management
 """
 
 import asyncio
 import json
 import os
-import subprocess
 import time
 from pathlib import Path
 
@@ -21,6 +20,8 @@ MATCHING_ENGINE_URL = os.environ.get("MATCHING_ENGINE_URL", "http://127.0.0.1:80
 ADMIN_PORT = int(os.environ.get("ADMIN_PORT", "9090"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/python_bots/data"))
 CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/app/matching-engine/config.json"))
+DOCKER_SOCKET = os.environ.get("DOCKER_SOCKET", "/var/run/docker.sock")
+COMPOSE_PROJECT = os.environ.get("COMPOSE_PROJECT", "")  # auto-detected if empty
 
 # Connected WebSocket clients (timer displays + admin dashboards)
 ws_clients: set[web.WebSocketResponse] = set()
@@ -67,20 +68,93 @@ async def timer_tick():
                 await broadcast({"type": "game_ended", "remaining": 0, "running": False, "paused": False})
 
 
-# ── Supervisord helpers ──────────────────────────────────────────
+# ── Docker API helpers ──────────────────────────────────────────
 
-def _supervisorctl(action: str, program: str) -> str:
-    """Run a supervisorctl command and return output."""
+def _docker_available() -> bool:
+    """Check if the Docker socket is mounted."""
+    return os.path.exists(DOCKER_SOCKET)
+
+
+async def _docker_api(method: str, path: str, **kwargs) -> tuple[int, dict | str]:
+    """Make a request to the Docker Engine API via Unix socket."""
     try:
-        result = subprocess.run(
-            ["supervisorctl", action, program],
-            capture_output=True, text=True, timeout=10,
-        )
-        return result.stdout.strip() or result.stderr.strip()
-    except FileNotFoundError:
-        return f"supervisorctl not found (running outside container?)"
+        conn = aiohttp.UnixConnector(path=DOCKER_SOCKET)
+        async with aiohttp.ClientSession(connector=conn) as session:
+            url = f"http://localhost{path}"
+            async with session.request(method, url, timeout=aiohttp.ClientTimeout(total=30), **kwargs) as resp:
+                try:
+                    body = await resp.json()
+                except Exception:
+                    body = await resp.text()
+                return resp.status, body
     except Exception as e:
-        return str(e)
+        return 500, str(e)
+
+
+async def _find_compose_project() -> str:
+    """Auto-detect the compose project name from our own container's labels."""
+    global COMPOSE_PROJECT
+    if COMPOSE_PROJECT:
+        return COMPOSE_PROJECT
+
+    # Read our own container ID from cgroup
+    try:
+        cgroup = Path("/proc/self/cgroup").read_text()
+        for line in cgroup.splitlines():
+            if "docker" in line:
+                COMPOSE_PROJECT = ""  # will use label filter below
+                break
+    except Exception:
+        pass
+
+    # Find containers with com.docker.compose.project label that include 'admin'
+    status, data = await _docker_api("GET", "/containers/json?all=true")
+    if status == 200 and isinstance(data, list):
+        for container in data:
+            labels = container.get("Labels", {})
+            service = labels.get("com.docker.compose.service", "")
+            if service == "admin":
+                COMPOSE_PROJECT = labels.get("com.docker.compose.project", "")
+                return COMPOSE_PROJECT
+
+    return COMPOSE_PROJECT
+
+
+async def _get_compose_containers() -> dict[str, dict]:
+    """Get all containers in the same compose project, keyed by service name."""
+    project = await _find_compose_project()
+    filters = json.dumps({"label": [f"com.docker.compose.project={project}"]}) if project else "{}"
+    status, data = await _docker_api("GET", f"/containers/json?all=true&filters={filters}")
+
+    services = {}
+    if status == 200 and isinstance(data, list):
+        for container in data:
+            labels = container.get("Labels", {})
+            service = labels.get("com.docker.compose.service", "")
+            if service:
+                state = container.get("State", "unknown")
+                services[service] = {
+                    "id": container["Id"][:12],
+                    "status": container.get("Status", ""),
+                    "state": state.upper(),
+                }
+    return services
+
+
+async def _docker_container_action(service_name: str, action: str) -> str:
+    """Start/stop/restart a compose service container by service name."""
+    containers = await _get_compose_containers()
+    info = containers.get(service_name)
+    if not info:
+        return f"Container for service '{service_name}' not found"
+
+    container_id = info["id"]
+    status, body = await _docker_api("POST", f"/containers/{container_id}/{action}")
+    if status in (204, 304):
+        return f"{service_name} {action} successful"
+    elif isinstance(body, dict) and "message" in body:
+        return body["message"]
+    return str(body) if body else f"{service_name} {action} completed"
 
 
 async def _proxy_to_engine(endpoint: str) -> tuple[int, str]:
@@ -206,38 +280,55 @@ async def api_tally_score(request):
 
 
 async def api_server_status(request):
-    """Get status of all managed processes."""
-    output = _supervisorctl("status", "all")
-    lines = [l.strip() for l in output.splitlines() if l.strip()]
-    processes = {}
-    for line in lines:
-        parts = line.split()
-        if len(parts) >= 2:
-            processes[parts[0]] = parts[1]
+    """Get status of all compose service containers."""
+    if not _docker_available():
+        return web.json_response({
+            "ok": False,
+            "error": "Docker socket not available. Mount /var/run/docker.sock into the admin container.",
+            "processes": {},
+        })
+
+    containers = await _get_compose_containers()
+    if not containers:
+        return web.json_response({
+            "ok": False,
+            "error": "No compose containers found. Check Docker socket permissions.",
+            "processes": {},
+        })
+
+    processes = {name: info["state"] for name, info in containers.items()}
     return web.json_response({"ok": True, "processes": processes})
 
 
 async def api_restart_server(request):
-    """Restart the matching engine."""
-    result = _supervisorctl("restart", "matching-engine")
+    """Restart the matching engine container."""
+    if not _docker_available():
+        return web.json_response({"ok": False, "error": "Docker socket not available"}, status=500)
+    result = await _docker_container_action("matching-engine", "restart")
     return web.json_response({"ok": True, "message": result})
 
 
 async def api_start_bot(request):
-    """Start the price enforcer bot."""
-    result = _supervisorctl("start", "price-enforcer")
+    """Start the price enforcer bot container."""
+    if not _docker_available():
+        return web.json_response({"ok": False, "error": "Docker socket not available"}, status=500)
+    result = await _docker_container_action("price-enforcer", "start")
     return web.json_response({"ok": True, "message": result})
 
 
 async def api_stop_bot(request):
-    """Stop the price enforcer bot."""
-    result = _supervisorctl("stop", "price-enforcer")
+    """Stop the price enforcer bot container."""
+    if not _docker_available():
+        return web.json_response({"ok": False, "error": "Docker socket not available"}, status=500)
+    result = await _docker_container_action("price-enforcer", "stop")
     return web.json_response({"ok": True, "message": result})
 
 
 async def api_restart_bot(request):
-    """Restart the price enforcer bot."""
-    result = _supervisorctl("restart", "price-enforcer")
+    """Restart the price enforcer bot container."""
+    if not _docker_available():
+        return web.json_response({"ok": False, "error": "Docker socket not available"}, status=500)
+    result = await _docker_container_action("price-enforcer", "restart")
     return web.json_response({"ok": True, "message": result})
 
 
@@ -261,6 +352,7 @@ async def api_upload_config(request):
 
 async def api_upload_data(request):
     """Upload price data files for the bots."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     reader = await request.multipart()
     uploaded = []
     while True:

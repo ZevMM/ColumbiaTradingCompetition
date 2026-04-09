@@ -1,6 +1,5 @@
 import React from 'react';
 import createPlotlyComponent from 'react-plotly.js/factory';
-import { useState } from 'react';
 
 const Plot = createPlotlyComponent(Plotly);
 const DISPLAY_MARGIN = 30;
@@ -36,6 +35,7 @@ const DepthChart = ({buyside, sellside, buyprices, sellprices}) => {
     },
     showlegend: false,
     autosize: true,
+    bargap: 0.1,
     margin: {
       t: 10,
       b: 30,
@@ -50,27 +50,20 @@ const DepthChart = ({buyside, sellside, buyprices, sellprices}) => {
     {
       x: buyprices,
       y: buyside,
-      type: 'scatter',
-      mode: 'lines',
+      type: 'bar',
       name: 'Bids',
-      line: { color: '#26a69a', shape: 'hv'},
-      fill: 'tozeroy',
-      fillcolor: 'rgba(38, 166, 154, 0.15)',
+      marker: { color: 'rgba(38, 166, 154, 0.7)' },
     },
     {
       x: sellprices,
       y: sellside,
-      type: 'scatter',
-      mode: 'lines',
+      type: 'bar',
       name: 'Asks',
-      line: { color: '#ef5350', shape: 'hv'},
-      fill: 'tozeroy',
-      fillcolor: 'rgba(239, 83, 80, 0.15)',
+      marker: { color: 'rgba(239, 83, 80, 0.7)' },
     },
   ];
 
   return (
-
       <Plot
         style={{ width: '100%', height: '100%' }}
         data={traces}

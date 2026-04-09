@@ -31,7 +31,7 @@ function App() {
           console.error("WebSocket error:", error);
           setUser(null);
           setWs(null);
-          setErr("Error connecting to server (check username and password)");
+          setErr("Connection failed — check username/password, or try again in a few seconds");
           setState(0);
         };
         newws.onopen = () => {
@@ -71,26 +71,41 @@ function App() {
             case "TradeOccurredMessage": {
               let {amount, symbol, resting_side, price, time} = body
               setGame(prevGame => {
-                let newgame = {...prevGame}
                 const sideKey = resting_side == "Buy" ? 'buy_side' : 'sell_side'
-                const cur = newgame[symbol][sideKey][price] || 0
+                const oldSide = prevGame[symbol][sideKey]
+                const cur = oldSide[price] || 0
+                const newSide = {...oldSide}
                 if (cur - amount <= 0) {
-                  delete newgame[symbol][sideKey][price]
+                  delete newSide[price]
                 } else {
-                  newgame[symbol][sideKey][price] = cur - amount
+                  newSide[price] = cur - amount
                 }
-                newgame[symbol].price_history.push([time, price, amount])
-                return newgame
+                return {
+                  ...prevGame,
+                  [symbol]: {
+                    ...prevGame[symbol],
+                    [sideKey]: newSide,
+                    price_history: [...prevGame[symbol].price_history, [time, price, amount]]
+                  }
+                }
               });
               break;
             }
             case "NewRestingOrderMessage": {
               let {side, amount, symbol, price} = body
               setGame(prevGame => {
-                let newgame = {...prevGame}
                 const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
-                newgame[symbol][sideKey][price] = (newgame[symbol][sideKey][price] || 0) + amount
-                return newgame
+                const oldSide = prevGame[symbol][sideKey]
+                return {
+                  ...prevGame,
+                  [symbol]: {
+                    ...prevGame[symbol],
+                    [sideKey]: {
+                      ...oldSide,
+                      [price]: (oldSide[price] || 0) + amount
+                    }
+                  }
+                }
               });
               break;
             }
@@ -194,15 +209,22 @@ function App() {
             case "CancelOccurredMessage": {
               let {symbol, price, side, amount} = body
               setGame(prevGame => {
-                let newgame = {...prevGame}
                 const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
-                const cur = newgame[symbol][sideKey][price] || 0
+                const oldSide = prevGame[symbol][sideKey]
+                const cur = oldSide[price] || 0
+                const newSide = {...oldSide}
                 if (cur - amount <= 0) {
-                  delete newgame[symbol][sideKey][price]
+                  delete newSide[price]
                 } else {
-                  newgame[symbol][sideKey][price] = cur - amount
+                  newSide[price] = cur - amount
                 }
-                return newgame
+                return {
+                  ...prevGame,
+                  [symbol]: {
+                    ...prevGame[symbol],
+                    [sideKey]: newSide
+                  }
+                }
               });
               break;
             }

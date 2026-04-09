@@ -1,8 +1,8 @@
 services:
   matching-engine:
     build: ./matching-engine
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     volumes:
       - ./matching-engine/config.json:/app/config.json:ro
     environment:
@@ -17,19 +17,42 @@ services:
 
   exchange-client:
     build: ./exchange-client
-    ports:
-      - "5173:5173"
+    expose:
+      - "5173"
     depends_on:
       - matching-engine
 
   timer:
     build: ./timer
-    ports:
-      - "3000:3000"
-    environment:
-      - VITE_SERVER_URL=http://matching-engine:8080
+    expose:
+      - "3000"
     depends_on:
       - matching-engine
+
+  admin:
+    build: ./admin
+    expose:
+      - "9090"
+    environment:
+      - MATCHING_ENGINE_URL=http://matching-engine:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - matching-engine
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /root/letsencrypt-backup:/etc/letsencrypt:ro
+      - /root/htpasswd-backup:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - matching-engine
+      - exchange-client
+      - timer
+      - admin
 
   price-enforcer:
     build: ./python_bots
