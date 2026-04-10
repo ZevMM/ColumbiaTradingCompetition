@@ -384,8 +384,7 @@ pub async fn websocket(
 
     println!("Trader with id {:?} connected.", trader_id);
     
-    // If trader already has a connection, clear the old one and allow reconnection.
-    // The old actor will stop on its own when its heartbeat times out.
+    // If trader already has an active connection, kick it before allowing the new one.
     {
         let mut account = state_data
             .global_account_state
@@ -393,9 +392,9 @@ pub async fn websocket(
             .lock()
             .unwrap();
 
-        if account.current_actor.is_some() {
-            warn!("Trader {:?} reconnecting — clearing stale connection", trader_id);
-            account.current_actor = None;
+        if let Some(old_actor) = account.current_actor.take() {
+            warn!("Trader {:?} already connected — kicking old session", trader_id);
+            old_actor.do_send(crate::message_types::KickMessage);
         }
     }
     
@@ -495,6 +494,19 @@ impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
         // there has to be a nicer way to do this, but cant figure out how to access inner type when doing a default match
         // these messages are sent by Server detailed in connection_server.rs
         ctx.text(serde_json::to_string(&*msg).unwrap());
+    }
+}
+
+impl Handler<crate::message_types::KickMessage> for MyWebSocketActor {
+    type Result = ();
+    fn handle(&mut self, _msg: crate::message_types::KickMessage, ctx: &mut Self::Context) {
+        warn!("Trader {:?} kicked — another session connected", self.associated_id);
+        ctx.text("{\"Error\": \"Another session connected with your account. You have been disconnected.\"}");
+        ctx.close(Some(ws::CloseReason {
+            code: ws::CloseCode::Normal,
+            description: Some("Replaced by new connection".to_string()),
+        }));
+        ctx.stop();
     }
 }
 

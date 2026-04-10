@@ -29,3 +29,7 @@ pub struct GameStartedMessage(pub String);
 #[derive(Message, Debug, Serialize, Clone)]
 #[rtype(result = "()")]
 pub struct GameEndMessage;
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct KickMessage;
