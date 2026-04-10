@@ -18,11 +18,10 @@ function App() {
   const gameref = useRef(game)
   const accountref = useRef(account)
   const kickedref = useRef(false)
+  // incase order fill comes before order confirm — stores list of {amount, price} per order_id
+  const tmpFillRef = useRef({})
   const [final_score, setFinalScore] = useState(0)
   const [retry, setRetry] = useState(0)
-  
-  //incase order fill comes before order confirm
-  let tmp_fill = {}
 
   useEffect(() => {
     console.log(user)
@@ -123,33 +122,36 @@ function App() {
               setAccount(prevAccount => {
                 let newaccount = {...prevAccount}
                 let {price, order_type, amount, symbol, order_id} = body;
-                
+
                 if (order_type == "Buy") {
                     newaccount.net_cents_balance -= price * amount
                 }
                 else {
                     newaccount.net_asset_balances[body.symbol] -= amount
                 }
-        
-                if (order_id in tmp_fill) {
-                    amount -= tmp_fill[order_id];
-                    if (order_type == "Buy") {
-                        newaccount.cents_balance -= price * tmp_fill[order_id]
-                        newaccount.asset_balances[symbol] += tmp_fill[order_id]
-                        newaccount.net_asset_balances[symbol] += tmp_fill[order_id]
-                    } else {
-                        newaccount.cents_balance += price * tmp_fill[order_id]
-                        newaccount.net_cents_balance += price * tmp_fill[order_id]
-                        newaccount.asset_balances[symbol] -= tmp_fill[order_id]
+
+                if (order_id in tmpFillRef.current) {
+                    const fills = tmpFillRef.current[order_id];
+                    for (const f of fills) {
+                        amount -= f.amount;
+                        if (order_type == "Buy") {
+                            newaccount.cents_balance -= f.price * f.amount
+                            newaccount.asset_balances[symbol] += f.amount
+                            newaccount.net_asset_balances[symbol] += f.amount
+                        } else {
+                            newaccount.cents_balance += f.price * f.amount
+                            newaccount.net_cents_balance += f.price * f.amount
+                            newaccount.asset_balances[symbol] -= f.amount
+                        }
                     }
-                    delete tmp_fill[order_id];
+                    delete tmpFillRef.current[order_id];
                 }
-        
+
                 if (amount > 0) {
                     body.amount = amount
                     newaccount.active_orders.push(body)
                 }
-        
+
                 return newaccount;
               });
               break;
@@ -162,10 +164,10 @@ function App() {
                       (e) => e.order_id == order_id
                   )
                   if (idx == -1) {
-                      if (order_id in tmp_fill) {
-                          tmp_fill[order_id] += amount_filled
+                      if (order_id in tmpFillRef.current) {
+                          tmpFillRef.current[order_id].push({amount: amount_filled, price})
                       } else {
-                          tmp_fill[order_id] = amount_filled
+                          tmpFillRef.current[order_id] = [{amount: amount_filled, price}]
                       }
                       return prevAccount; // Return unchanged if order not found
                   }
@@ -219,10 +221,9 @@ function App() {
                 setWs(null);
                 setErr("Disconnected — another device logged in with your account.");
                 setState(0);
+              } else {
+                setErr(body)
               }
-              break;
-            case "Error":
-              setErr(body)
               break;
             case "CancelOccurredMessage": {
               let {symbol, price, side, amount} = body
