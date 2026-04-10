@@ -79,32 +79,32 @@ body {
 .stats-bar {
   display: flex;
   align-items: stretch;
-  padding: 10px 20px;
-  gap: 24px;
+  padding: 14px 24px;
+  gap: 28px;
   font-family: var(--font-mono);
 }
 
 .stats-bar .stats-section {
   display: flex;
-  gap: 24px;
+  gap: 28px;
   align-items: center;
 }
 
 .stats-bar .stats-section + .stats-section {
   border-left: 1px solid var(--border-default);
-  padding-left: 24px;
+  padding-left: 28px;
 }
 
 .stats-bar .stat-label {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-secondary);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .stats-bar .stat-value {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--text-primary);
   display: flex;
@@ -112,10 +112,23 @@ body {
   gap: 4px;
 }
 
+.stats-bar .stat-value.stat-big {
+  font-size: 26px;
+  font-weight: 600;
+}
+
 .stats-bar .stat-value img {
   width: 14px;
   opacity: 0.7;
 }
+
+.stats-bar .stat-value.stat-big img {
+  width: 18px;
+}
+
+.pnl-pos { color: var(--buy); }
+.pnl-neg { color: var(--sell); }
+.pnl-flat { color: var(--text-secondary); }
 
 /* ── Order Form ──────────────────────────────────────── */
 .order-form {
@@ -210,8 +223,9 @@ body {
 
 .ticker-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
   padding: 10px 12px;
   cursor: pointer;
   border-left: 3px solid transparent;
@@ -228,15 +242,47 @@ body {
   border-left-color: var(--accent);
 }
 
+.ticker-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.ticker-mid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+}
+
+.ticker-bot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ticker-pos-label {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ticker-pos {
+  font-weight: 600;
+}
+
 .ticker-symbol {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .ticker-price {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 16px;
   text-align: right;
+  font-weight: 600;
 }
 
 .ticker-price img {
@@ -245,10 +291,17 @@ body {
   vertical-align: middle;
 }
 
+.ticker-bidask {
+  font-size: 12px;
+}
+
+.ba-bid { color: var(--buy); }
+.ba-ask { color: var(--sell); }
+.ba-sep { color: var(--text-secondary); padding: 0 4px; }
+
 .ticker-change {
   font-family: var(--font-mono);
-  font-size: 11px;
-  margin-top: 2px;
+  font-size: 12px;
 }
 
 .ticker-change.up   { color: var(--buy); }
@@ -261,7 +314,7 @@ body {
   flex-direction: column;
   height: 100%;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .order-book .book-header {
@@ -278,25 +331,50 @@ body {
 
 .order-book .book-header > div { flex: 1; }
 
-#buyside {
+.book-sell-side {
   overflow-y: auto;
   display: flex;
   flex-flow: column nowrap;
   flex: 1;
 }
 
-#buyside > :first-child {
+.book-sell-side > :first-child {
   margin-top: auto !important;
 }
 
-.book-sell-side {
+.book-buy-side {
   overflow-y: auto;
   flex: 1;
 }
 
+.book-spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--bg-panel-alt);
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+
+.spread-mid {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.spread-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
 .book-row {
   display: flex;
-  padding: 2px 10px;
+  padding: 3px 10px;
 }
 
 .book-row > div { flex: 1; }
@@ -304,10 +382,31 @@ body {
 .book-row.buy-row { color: var(--buy); }
 .book-row.sell-row { color: var(--sell); }
 
+.book-row.best-bid {
+  border-top: 1px solid rgba(38, 166, 154, 0.4);
+  font-weight: 700;
+}
+
+.book-row.best-ask {
+  border-bottom: 1px solid rgba(239, 83, 80, 0.4);
+  font-weight: 700;
+}
+
 /* ── Portfolio ───────────────────────────────────────── */
 .portfolio {
   height: 100%;
   overflow-y: auto;
+}
+
+.portfolio.portfolio-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .portfolio table {

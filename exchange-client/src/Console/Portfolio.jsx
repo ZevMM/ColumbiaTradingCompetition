@@ -2,6 +2,13 @@ import { useState } from "react"
 import token from "../assets/Token.png"
 
 function Portfolio({ws, account, user}) {
+    if (account.active_orders.length === 0) {
+        return (
+            <div className="portfolio portfolio-empty">
+                No active orders
+            </div>
+        )
+    }
     return (
         <div className="portfolio">
         <table>
@@ -20,7 +27,7 @@ function Portfolio({ws, account, user}) {
                         <td>{o.symbol}</td>
                         <td>{o.price}</td>
                         <td>{o.amount}</td>
-                        <td>{o.order_type}</td>
+                        <td className={o.order_type === "Buy" ? "pnl-pos" : "pnl-neg"}>{o.order_type}</td>
                         <div className="overlay">
                             <input type="button" value="Cancel" onClick={() => {
                             ws.send(

@@ -80,7 +80,7 @@ function Console({ws, user, game, account}) {
         </div>
         <div className="area-tickers panel">
             <div className="panel-header">Markets</div>
-            <Tickers cur_ticker={cur_ticker} setCur_ticker={setCur_ticker} all_tickers={all_tickers} game={game}/>
+            <Tickers cur_ticker={cur_ticker} setCur_ticker={setCur_ticker} all_tickers={all_tickers} game={game} account={account}/>
         </div>
         <div className="area-port panel">
             <div className="panel-header">Active Orders</div>
