@@ -37,8 +37,16 @@ function App() {
         newws.onopen = () => {
           console.log("ws opened");
         }
-        newws.onclose = () => {
-          console.log("ws closed", retry);
+        newws.onclose = (e) => {
+          console.log("ws closed", retry, e.code, e.reason);
+          // Don't reconnect if kicked by another session (normal close from server)
+          if (e.code === 1000) {
+            setUser(null);
+            setWs(null);
+            setErr("Disconnected — another device logged in with your account.");
+            setState(0);
+            return;
+          }
           console.log("retrying");
           setRetry(retry + 1);
         };
