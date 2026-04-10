@@ -14,6 +14,7 @@ function App() {
   const [ws, setWs] = useState(null)
   const [game, setGame] = useState(null)
   const [account, setAccount] = useState(null)
+  const [trades, setTrades] = useState([])  // own fill history
   const [state, setState] = useState(0)
   const gameref = useRef(game)
   const accountref = useRef(account)
@@ -132,6 +133,7 @@ function App() {
 
                 if (order_id in tmpFillRef.current) {
                     const fills = tmpFillRef.current[order_id];
+                    const newTrades = [];
                     for (const f of fills) {
                         amount -= f.amount;
                         if (order_type == "Buy") {
@@ -143,7 +145,9 @@ function App() {
                             newaccount.net_cents_balance += f.price * f.amount
                             newaccount.asset_balances[symbol] -= f.amount
                         }
+                        newTrades.push({ts: Date.now(), symbol, side: order_type, amount: f.amount, price: f.price});
                     }
+                    setTrades(prev => [...newTrades.reverse(), ...prev].slice(0, 200))
                     delete tmpFillRef.current[order_id];
                 }
 
@@ -182,13 +186,15 @@ function App() {
                       newaccount.net_cents_balance += price * amount_filled
                       newaccount.asset_balances[symbol] -= amount_filled
                   }
-                  
+
+                  setTrades(prev => [{ts: Date.now(), symbol, side: order_type, amount: amount_filled, price}, ...prev].slice(0, 200))
+
                   if (amount == amount_filled) {
                       newaccount.active_orders.splice(idx, 1);
                   } else {
                       newaccount.active_orders[idx].amount -= amount_filled;
                   }
-                  
+
                   return newaccount;
               });
               break;
@@ -263,7 +269,7 @@ function App() {
     <>
       {err && <ErrorPopup message={err} clearError={() => setErr(null)} />}
       {state === 2 && <EndScreen final_score={final_score} />}
-      {ws && state === 1 && <Console ws={ws} user={user} game={game} account={account} />}
+      {ws && state === 1 && <Console ws={ws} user={user} game={game} account={account} trades={trades} />}
       {ws && state === 0 && <WaitScreen />}
       {!ws && <Login user={user} setUser={setUser} setWs={setWs}/>}
     </>

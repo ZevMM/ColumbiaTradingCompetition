@@ -62,7 +62,7 @@ body {
   grid-template-areas:
     "stats   stats   stats   stats"
     "order   tickers chart   book"
-    "port    port    chart2  book";
+    "port    trades  chart2  book";
   gap: 3px;
   padding: 3px;
 }
@@ -74,6 +74,7 @@ body {
 .area-chart2  { grid-area: chart2; }
 .area-book    { grid-area: book; }
 .area-port    { grid-area: port; }
+.area-trades  { grid-area: trades; }
 
 /* ── Stats Bar ───────────────────────────────────────── */
 .stats-bar {
@@ -399,6 +400,63 @@ body {
 }
 
 .portfolio.portfolio-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Trade History ───────────────────────────────────── */
+.trade-history {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.trade-history table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.trade-history thead tr {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel-alt);
+}
+
+.trade-history th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.trade-history th img {
+  width: 10px;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
+.trade-history td {
+  padding: 5px 10px;
+  color: var(--text-primary);
+}
+
+.trade-history tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.trade-history.trade-history-empty {
   display: flex;
   align-items: center;
   justify-content: center;

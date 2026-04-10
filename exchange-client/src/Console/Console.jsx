@@ -5,11 +5,12 @@ import PriceChart from './PriceChart';
 import DepthChart from './DepthChart';
 import OrderForm from './OrderForm';
 import Portfolio from './Portfolio';
+import TradeHistory from './TradeHistory';
 import StatsBar from './StatsBar';
 
 const DEPTH_CHART_FPS = 10;
 
-function Console({ws, user, game, account}) {
+function Console({ws, user, game, account, trades}) {
   if (!game || !account) { return <div>Loading...</div> }
 
   const [cur_ticker, setCur_ticker] = useState(Object.keys(game)[0]);
@@ -85,6 +86,10 @@ function Console({ws, user, game, account}) {
         <div className="area-port panel">
             <div className="panel-header">Active Orders</div>
             <Portfolio ws={ws} account={account} user={user}/>
+        </div>
+        <div className="area-trades panel">
+            <div className="panel-header">Trade History</div>
+            <TradeHistory trades={trades}/>
         </div>
 
         <div className="area-chart panel" style={{padding: 0}}>
