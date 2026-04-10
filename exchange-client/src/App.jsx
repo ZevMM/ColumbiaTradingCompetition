@@ -17,6 +17,7 @@ function App() {
   const [state, setState] = useState(0)
   const gameref = useRef(game)
   const accountref = useRef(account)
+  const kickedref = useRef(false)
   const [final_score, setFinalScore] = useState(0)
   const [retry, setRetry] = useState(0)
   
@@ -26,19 +27,24 @@ function App() {
   useEffect(() => {
     console.log(user)
     if (user) {
+        kickedref.current = false;
         let newws = new WebSocket(addr, [`${user.uid}|${user.pwd}`]);
         newws.onerror = (error) => {
           console.error("WebSocket error:", error);
           setUser(null);
           setWs(null);
-          setErr("Connection failed — this account may already be logged in elsewhere, or check your username/password.");
+          setErr("Connection failed — check username/password, or try again in a few seconds");
           setState(0);
         };
         newws.onopen = () => {
           console.log("ws opened");
         }
         newws.onclose = () => {
-          console.log("ws closed", retry);
+          console.log("ws closed", retry, "kicked:", kickedref.current);
+          if (kickedref.current) {
+            // Don't reconnect — we were kicked by another session
+            return;
+          }
           console.log("retrying");
           setRetry(retry + 1);
         };
@@ -205,6 +211,15 @@ function App() {
             }
             case "CancelErrorMessage":
               setErr(body.error_details)
+              break;
+            case "Error":
+              if (typeof body === "string" && body.includes("another session")) {
+                kickedref.current = true;
+                setUser(null);
+                setWs(null);
+                setErr("Disconnected — another device logged in with your account.");
+                setState(0);
+              }
               break;
             case "Error":
               setErr(body)

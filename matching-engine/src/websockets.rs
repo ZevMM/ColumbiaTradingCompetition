@@ -384,17 +384,17 @@ pub async fn websocket(
 
     println!("Trader with id {:?} connected.", trader_id);
     
-    // Reject if trader already has an active connection.
+    // If trader already has an active connection, kick it before allowing the new one.
     {
-        let account = state_data
+        let mut account = state_data
             .global_account_state
             .index_ref(trader_id)
             .lock()
             .unwrap();
 
-        if account.current_actor.is_some() {
-            warn!("Trader {:?} rejected — already connected", trader_id);
-            return Ok(HttpResponse::Conflict().body("Already logged in from another session"));
+        if let Some(old_actor) = account.current_actor.take() {
+            warn!("Trader {:?} already connected — kicking old session", trader_id);
+            old_actor.do_send(crate::message_types::KickMessage);
         }
     }
     
