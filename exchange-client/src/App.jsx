@@ -31,22 +31,14 @@ function App() {
           console.error("WebSocket error:", error);
           setUser(null);
           setWs(null);
-          setErr("Connection failed — check username/password, or try again in a few seconds");
+          setErr("Connection failed — this account may already be logged in elsewhere, or check your username/password.");
           setState(0);
         };
         newws.onopen = () => {
           console.log("ws opened");
         }
-        newws.onclose = (e) => {
-          console.log("ws closed", retry, e.code, e.reason);
-          // Don't reconnect if kicked by another session (normal close from server)
-          if (e.code === 1000) {
-            setUser(null);
-            setWs(null);
-            setErr("Disconnected — another device logged in with your account.");
-            setState(0);
-            return;
-          }
+        newws.onclose = () => {
+          console.log("ws closed", retry);
           console.log("retrying");
           setRetry(retry + 1);
         };
@@ -213,6 +205,9 @@ function App() {
             }
             case "CancelErrorMessage":
               setErr(body.error_details)
+              break;
+            case "Error":
+              setErr(body)
               break;
             case "CancelOccurredMessage": {
               let {symbol, price, side, amount} = body
