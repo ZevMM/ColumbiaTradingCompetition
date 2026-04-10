@@ -215,8 +215,9 @@ function App() {
               setErr(body.error_details)
               break;
             case "Error":
-              if (typeof body === "string" && body.includes("another session")) {
+              if (typeof body === "string" && body.toLowerCase().includes("another session")) {
                 kickedref.current = true;
+                newws.close();
                 setUser(null);
                 setWs(null);
                 setErr("Disconnected — another device logged in with your account.");
