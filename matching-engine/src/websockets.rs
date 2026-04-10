@@ -436,12 +436,15 @@ impl Actor for MyWebSocketActor {
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
         let account_id = self.associated_id;
-        
+        let my_addr = ctx.address();
+
         self.relay_server_addr.do_send(CloseMessage {
             ip: self.connection_ip,
             addr: ctx.address().recipient(),
         });
-        
+
+        // Only clear current_actor if it still points to *this* actor.
+        // Otherwise we'd clobber a newer session that replaced us.
         match self
             .global_state
             .global_account_state
@@ -449,15 +452,14 @@ impl Actor for MyWebSocketActor {
             .lock()
         {
             Ok(mut guard) => {
-                if guard.current_actor.is_some() {
+                if guard.current_actor.as_ref() == Some(&my_addr) {
                     guard.current_actor = None;
                     info!("Cleared current_actor for trader {:?}", account_id);
                 }
             }
             Err(poisoned) => {
-                // Recover from poisoned mutex
                 let mut guard = poisoned.into_inner();
-                if guard.current_actor.is_some() {
+                if guard.current_actor.as_ref() == Some(&my_addr) {
                     guard.current_actor = None;
                     warn!("Recovered from poisoned mutex for trader {:?}", account_id);
                 }
@@ -661,12 +663,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
             // Ok(ws::Message::Text(text)) => ctx.text(text),
             Ok(ws::Message::Close(reason)) => {
                 let account_id = self.associated_id;
-                self.global_state
+                let my_addr = ctx.address();
+                let mut guard = self.global_state
                     .global_account_state
                     .index_ref(account_id)
                     .lock()
-                    .unwrap()
-                    .current_actor = None;
+                    .unwrap();
+                if guard.current_actor.as_ref() == Some(&my_addr) {
+                    guard.current_actor = None;
+                }
+                drop(guard);
                 info!("Received close message, closing context.");
                 ctx.close(reason);
                 ctx.stop();
