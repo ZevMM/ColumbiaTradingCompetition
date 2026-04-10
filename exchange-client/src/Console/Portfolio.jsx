@@ -2,6 +2,20 @@ import { useState } from "react"
 import token from "../assets/Token.png"
 
 function Portfolio({ws, account, user}) {
+    const cancelAll = () => {
+        for (const o of account.active_orders) {
+            ws.send(JSON.stringify({
+                MessageType: "CancelRequest",
+                OrderId: parseInt(o.order_id),
+                TraderId: user.uid,
+                Price: parseInt(o.price),
+                Symbol: o.symbol,
+                Side: o.order_type,
+                Password: Array.from(user.pwd),
+            }))
+        }
+    }
+
     if (account.active_orders.length === 0) {
         return (
             <div className="portfolio portfolio-empty">
@@ -11,6 +25,9 @@ function Portfolio({ws, account, user}) {
     }
     return (
         <div className="portfolio">
+        <div className="portfolio-actions">
+            <button className="btn-cancel-all" onClick={cancelAll}>Cancel All ({account.active_orders.length})</button>
+        </div>
         <table>
             <thead>
             <tr>
