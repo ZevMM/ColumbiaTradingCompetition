@@ -1,6 +1,13 @@
+import { useRef, useEffect } from "react"
 import token from "../assets/Token.png"
 
 function OrderBook({buyside, sellside, buyprices, sellprices}) {
+    const askContainerRef = useRef(null);
+    useEffect(() => {
+        if (askContainerRef.current) {
+            askContainerRef.current.scrollTop = askContainerRef.current.scrollHeight;
+        }
+    }, [sellprices.length]);
     // Data conventions from Console.jsx:
     //   buyprices is ASCENDING (lowest first, highest=best bid last)
     //   sellprices is ASCENDING (lowest=best ask first, highest last)
@@ -26,7 +33,7 @@ function OrderBook({buyside, sellside, buyprices, sellprices}) {
                 <div style={{textAlign: 'right'}}>Volume</div>
             </div>
 
-            <div className="book-sell-side">
+            <div className="book-sell-side" ref={askContainerRef}>
                 {askIndices.map((i) => (
                     <div key={i} className={`book-row sell-row${i === 0 ? ' best-ask' : ''}`}
                         style={{background: `linear-gradient(to left, rgba(239, 83, 80, 0.25) ${sellside[i] * 100 / askMax}%, transparent ${sellside[i] * 100 / askMax}%)`}}>
