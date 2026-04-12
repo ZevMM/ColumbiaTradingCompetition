@@ -347,7 +347,15 @@ async def api_upload_config(request):
         return web.json_response({"ok": False, "error": f"Invalid JSON: {e}"}, status=400)
 
     CONFIG_PATH.write_bytes(data)
-    return web.json_response({"ok": True, "message": f"Config uploaded to {CONFIG_PATH}"})
+
+    restart_msg = "matching engine not restarted (Docker socket unavailable)"
+    if _docker_available():
+        restart_msg = await _docker_container_action("matching-engine", "restart")
+
+    return web.json_response({
+        "ok": True,
+        "message": f"Config uploaded to {CONFIG_PATH}; {restart_msg}",
+    })
 
 
 VALID_ASSETS = {"AD", "TS", "TT"}

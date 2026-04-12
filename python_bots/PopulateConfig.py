@@ -1,13 +1,12 @@
 import json
 import pandas as pd
 
-max_price_cents = 101
 start_cents_balance = 10000
 start_asset_balance = 100
 
-accounts = [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}, {"trader_id": "test1", "password": "00t1"}, {"trader_id": "test2", "password": "00t2"}, {"trader_id": "test3", "password": "00t3"}, {"trader_id": "test4", "password": "00t4"}, {"trader_id": "test5", "password": "00t5"}]
+accounts = [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}, {"trader_id": "ryan", "password": "6767"}]
 
-jsonout= { "max_price_cents": max_price_cents,
+jsonout= { 
           "start_asset_balance": start_asset_balance,
           "start_cents_balance" : start_cents_balance,
         "assets": [

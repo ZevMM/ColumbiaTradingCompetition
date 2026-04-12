@@ -36,9 +36,11 @@ services:
     environment:
       - MATCHING_ENGINE_URL=http://matching-engine:8080
       - DATA_DIR=/app/data
+      - CONFIG_PATH=/app/matching-engine/config.json
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - bot-data:/app/data
+      - ./matching-engine/config.json:/app/matching-engine/config.json
     depends_on:
       - matching-engine
 

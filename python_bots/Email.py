@@ -24,6 +24,27 @@ message = MIMEMultipart()
 message["From"] = sender_email
 message["Subject"] = subject
 
+start_cents_balance = 10000
+start_asset_balance = 100
+
+accounts = [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}, {"trader_id": "ryan", "password": "6767"}]
+
+jsonout= { 
+          "start_asset_balance": start_asset_balance,
+          "start_cents_balance" : start_cents_balance,
+        "assets": [
+        {
+            "symbol": "AD",
+        },
+        {
+            "symbol": "TS",
+        },
+        {
+            "symbol": "TT",
+        }
+    ],
+}
+
 with smtplib.SMTP(smtp_server, smtp_port) as server:
     server.starttls()
     server.login(sender_email, sender_password) 
@@ -35,13 +56,15 @@ with smtplib.SMTP(smtp_server, smtp_port) as server:
         message["From"] = sender_email
         message["Subject"] = subject
         message["To"] = email
-        trader_id = ''.join(e if e.isalnum() else "_" for e in email.split("@")[0]) 
-        password = str(index).zfill(4)
-
+        trader_id = f"trader{index}"
+        password = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+        accounts.append({"trader_id": trader_id, "password": password})
         body = f'''
-        Web Client: https://zevmm.github.io/ColumbiaTradingCompetition/ \n
+        Web Client: https://exchange.columbia.trade/ \n
         \n
-        Datastream: wss://trading-competition-148005249496.us-east4.run.app/market_data/ws \n
+        API Endpoint: wss://exchange.columbia.trade/orders/ws \n
+        \n
+        Datastream: wss://exchange.columbia.trade/market_data/ws \n
         ================== \n
         \n
         Trader Id: {trader_id} \n
@@ -50,3 +73,7 @@ with smtplib.SMTP(smtp_server, smtp_port) as server:
         message.attach(MIMEText(body, "plain"))
         server.sendmail(sender_email, email, message.as_string())
         print(f"Email sent to {email}")
+
+    jsonout["accounts"] = accounts
+    with open("../matching-engine/config.json", "w") as engine_conf:
+        engine_conf.write(json.dumps(jsonout))
