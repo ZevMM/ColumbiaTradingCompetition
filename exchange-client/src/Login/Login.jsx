@@ -1,15 +1,21 @@
 import { useState } from 'react'
 
 function Login({user, setUser}) {
-    if (user) {return <div>Loading...</div>}
     const saved = JSON.parse(localStorage.getItem('credentials') || '{}')
     const [name, setName] = useState(saved.uid || "")
     const [password, setPassword] = useState(saved.pwd || "")
 
+    if (user) {return <div>Loading...</div>}
+
     function handleSubmit(e) {
         e.preventDefault()
-        const creds = {uid: name, pwd: password}
-        localStorage.setItem('credentials', JSON.stringify(creds))
+        const trimmedName = name.trim()
+        const trimmedPwd = password.trim()
+        if (!trimmedName || !trimmedPwd) return
+        const creds = {uid: trimmedName, pwd: trimmedPwd}
+        try {
+            localStorage.setItem('credentials', JSON.stringify(creds))
+        } catch (_) { /* Safari private mode can throw */ }
         setUser(creds)
     }
 

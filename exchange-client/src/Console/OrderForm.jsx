@@ -2,6 +2,7 @@ import token from "../assets/Token.png"
 
 let placeOrder = (e, side, user, ws) => {
     e.preventDefault()
+    if (!user || !user.uid || !user.pwd || !side || !ws) return
     const order = new FormData(e.target)
 
     const message = {

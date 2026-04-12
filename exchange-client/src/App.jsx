@@ -271,9 +271,9 @@ function App() {
     <>
       {err && <ErrorPopup message={err} clearError={() => setErr(null)} />}
       {state === 2 && <EndScreen final_score={final_score} />}
-      {ws && state === 1 && <Console ws={ws} user={user} game={game} account={account} trades={trades} />}
-      {ws && state === 0 && <WaitScreen />}
-      {!ws && <Login user={user} setUser={setUser} setWs={setWs}/>}
+      {ws && user && state === 1 && <Console ws={ws} user={user} game={game} account={account} trades={trades} />}
+      {ws && user && state === 0 && <WaitScreen />}
+      {(!ws || !user) && <Login user={user} setUser={setUser} setWs={setWs}/>}
     </>
   )
 }
