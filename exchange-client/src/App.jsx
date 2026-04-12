@@ -177,9 +177,10 @@ function App() {
                       return prevAccount; // Return unchanged if order not found
                   }
                   
-                  let {order_type, symbol, amount} = newaccount.active_orders[idx]
+                  let {order_type, symbol, amount, price: limit_price} = newaccount.active_orders[idx]
                   if (order_type == "Buy") {
                       newaccount.cents_balance -= price * amount_filled
+                      newaccount.net_cents_balance += (limit_price - price) * amount_filled
                       newaccount.asset_balances[symbol] += amount_filled
                       newaccount.net_asset_balances[symbol] += amount_filled
                   } else {
