@@ -5,7 +5,8 @@
       "Skill(update-config)",
       "Bash(find:*)",
       "Bash(docker compose:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

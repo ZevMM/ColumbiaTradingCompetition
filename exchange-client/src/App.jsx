@@ -138,6 +138,7 @@ function App() {
                         amount -= f.amount;
                         if (order_type == "Buy") {
                             newaccount.cents_balance -= f.price * f.amount
+                            newaccount.net_cents_balance += (price - f.price) * f.amount
                             newaccount.asset_balances[symbol] += f.amount
                             newaccount.net_asset_balances[symbol] += f.amount
                         } else {

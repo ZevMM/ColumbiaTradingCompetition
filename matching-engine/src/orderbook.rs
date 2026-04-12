@@ -376,6 +376,17 @@ impl OrderBook {
                 start_time,
             );
 
+            // Refund the price improvement on aggressive buys: margin was
+            // reserved at buy_order.price but the fill happened at best_ask_price.
+            if best_ask_price < buy_order.price && !buy_order.trader_id.is_price_enforcer() {
+                let refund = (buy_order.price - best_ask_price) * amount_to_trade;
+                accounts_data
+                    .index_ref(buy_order.trader_id)
+                    .lock()
+                    .unwrap()
+                    .net_cents_balance += refund;
+            }
+
             buy_order.amount -= amount_to_trade;
 
             let fully_filled = {
