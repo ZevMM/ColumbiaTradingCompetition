@@ -29,7 +29,8 @@ start_asset_balance = 100
 
 accounts = [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}, {"trader_id": "ryan", "password": "6767"}]
 
-jsonout= { 
+jsonout= {
+          "order_rate_limit_per_second": 10,
           "start_asset_balance": start_asset_balance,
           "start_cents_balance" : start_cents_balance,
         "assets": [

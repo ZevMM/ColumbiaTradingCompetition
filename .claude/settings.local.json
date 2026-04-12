@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cargo check:*)",
       "Skill(update-config)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(docker compose:*)",
+      "Bash(python3:*)"
     ]
   }
 }
