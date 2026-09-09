@@ -18,7 +18,7 @@ impl Handler<GameStartedMessage> for MyWebSocketActor {
 impl Handler<GameEndMessage> for MyWebSocketActor {
     type Result = ();
 
-    fn handle(&mut self, msg: GameEndMessage, ctx: &mut Self::Context) {
+    fn handle(&mut self, _msg: GameEndMessage, ctx: &mut Self::Context) {
         ctx.text(format!("{{\"GameEndMessage\" : \"Game Over\"}}"));
     }
 }
@@ -88,7 +88,7 @@ pub async fn tally_score(global_state: web::Data<GlobalState>) -> Result<HttpRes
             let mut total_value = account.cents_balance;
 
             for (symbol, price) in &final_prices {
-                let asset_balance = *account.asset_balances.index_ref(symbol).lock().unwrap();
+                let asset_balance = *account.asset_balances.index_ref(symbol);
                 let asset_value =  (*price as usize) * (100 * (asset_balance as usize)) / (100 + (asset_balance as usize));
                 total_value += asset_value;
             }

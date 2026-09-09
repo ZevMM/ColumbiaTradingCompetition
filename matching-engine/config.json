@@ -1,1 +1,195 @@
-{"order_rate_limit_per_second": 10, "start_asset_balance": 100, "start_cents_balance": 10000, "assets": [{"symbol": "AD"}, {"symbol": "TS"}, {"symbol": "TT"}], "accounts": [{"trader_id": "Price_Enforcer", "password": "penf"}, {"trader_id": "zev", "password": "0000"}, {"trader_id": "ryan", "password": "6767"}, {"trader_id": "trader1", "password": "cuvY"}, {"trader_id": "trader2", "password": "tdsu"}, {"trader_id": "trader3", "password": "ZfyK"}, {"trader_id": "trader4", "password": "Oq86"}, {"trader_id": "trader5", "password": "yqds"}, {"trader_id": "trader6", "password": "BKrE"}, {"trader_id": "trader7", "password": "lN7e"}, {"trader_id": "trader8", "password": "Peud"}, {"trader_id": "trader9", "password": "qp38"}, {"trader_id": "trader10", "password": "fXur"}, {"trader_id": "trader11", "password": "iFsB"}, {"trader_id": "trader12", "password": "Pigr"}, {"trader_id": "trader13", "password": "ZSwJ"}]}
+{
+  "order_rate_limit_per_second": 100,
+  "start_asset_balance": 100,
+  "start_cents_balance": 10000,
+  "assets": [
+    {
+      "symbol": "AD"
+    },
+    {
+      "symbol": "TS"
+    },
+    {
+      "symbol": "TT"
+    }
+  ],
+  "accounts": [
+    {
+      "trader_id": "Price_Enforcer",
+      "password": "penf"
+    },
+    {
+      "trader_id": "zev",
+      "password": "0000"
+    },
+    {
+      "trader_id": "ryan",
+      "password": "6767"
+    },
+    {
+      "trader_id": "trader1",
+      "password": "KtA4"
+    },
+    {
+      "trader_id": "trader2",
+      "password": "Od0p"
+    },
+    {
+      "trader_id": "trader3",
+      "password": "HH0t"
+    },
+    {
+      "trader_id": "trader4",
+      "password": "N2pY"
+    },
+    {
+      "trader_id": "trader5",
+      "password": "C9X7"
+    },
+    {
+      "trader_id": "trader6",
+      "password": "QyEv"
+    },
+    {
+      "trader_id": "trader7",
+      "password": "uDAL"
+    },
+    {
+      "trader_id": "trader8",
+      "password": "29hA"
+    },
+    {
+      "trader_id": "trader9",
+      "password": "E9hR"
+    },
+    {
+      "trader_id": "trader10",
+      "password": "tFZA"
+    },
+    {
+      "trader_id": "trader11",
+      "password": "BF1z"
+    },
+    {
+      "trader_id": "trader12",
+      "password": "VjLH"
+    },
+    {
+      "trader_id": "trader13",
+      "password": "tiHO"
+    },
+    {
+      "trader_id": "trader14",
+      "password": "CHGf"
+    },
+    {
+      "trader_id": "trader15",
+      "password": "v8oa"
+    },
+    {
+      "trader_id": "trader16",
+      "password": "oamJ"
+    },
+    {
+      "trader_id": "trader17",
+      "password": "a55j"
+    },
+    {
+      "trader_id": "trader18",
+      "password": "xwZM"
+    },
+    {
+      "trader_id": "trader19",
+      "password": "X5E2"
+    },
+    {
+      "trader_id": "trader20",
+      "password": "kEdr"
+    },
+    {
+      "trader_id": "trader21",
+      "password": "902b"
+    },
+    {
+      "trader_id": "trader22",
+      "password": "TyLV"
+    },
+    {
+      "trader_id": "trader23",
+      "password": "YiF3"
+    },
+    {
+      "trader_id": "trader24",
+      "password": "SszH"
+    },
+    {
+      "trader_id": "trader25",
+      "password": "kRYY"
+    },
+    {
+      "trader_id": "trader26",
+      "password": "oHxs"
+    },
+    {
+      "trader_id": "trader27",
+      "password": "rH55"
+    },
+    {
+      "trader_id": "trader28",
+      "password": "BZVV"
+    },
+    {
+      "trader_id": "trader29",
+      "password": "Qoqc"
+    },
+    {
+      "trader_id": "trader30",
+      "password": "K8x8"
+    },
+    {
+      "trader_id": "trader31",
+      "password": "K7j1"
+    },
+    {
+      "trader_id": "trader32",
+      "password": "4rqv"
+    },
+    {
+      "trader_id": "trader33",
+      "password": "YAEA"
+    },
+    {
+      "trader_id": "trader34",
+      "password": "HkbB"
+    },
+    {
+      "trader_id": "trader35",
+      "password": "TN9a"
+    },
+    {
+      "trader_id": "trader36",
+      "password": "5Izv"
+    },
+    {
+      "trader_id": "trader37",
+      "password": "GcYu"
+    },
+    {
+      "trader_id": "trader38",
+      "password": "GNen"
+    },
+    {
+      "trader_id": "trader39",
+      "password": "pLFL"
+    },
+    {
+      "trader_id": "trader40",
+      "password": "0gYn"
+    },
+    {
+      "trader_id": "trader41",
+      "password": "9G7N"
+    }
+  ],
+  "order_rate_limit_burst": 200
+}

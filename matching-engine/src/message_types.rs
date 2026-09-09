@@ -1,22 +1,22 @@
 /// Defines all main message types for internal actor communication
 use actix::*;
 use serde::Serialize;
-use std::sync::Arc;
 
-use crate::{api_messages::OutgoingMessage, config::TraderIp};
+use crate::api_messages::JsonPayload;
+use crate::config::TraderIp;
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct OpenMessage{
     pub ip: TraderIp,
-    pub addr: Recipient<Arc<OutgoingMessage>>
+    pub addr: Recipient<JsonPayload>
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct CloseMessage{
     pub ip: TraderIp,
-    pub addr: Recipient<Arc<OutgoingMessage>>
+    pub addr: Recipient<JsonPayload>
 }
 
 //not technically internal, but shouldn't be exposed to general users

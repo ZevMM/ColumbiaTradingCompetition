@@ -47,6 +47,15 @@ features = [
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
     "serde"
 ]
+[profile.release]
+# Aggressive LTO: allows cross-crate inlining and whole-program optimization.
+# "thin" is usually the best balance between compile time and runtime speed on
+# AppleClang/LLVM toolchains. Use "fat" only if you can tolerate much longer builds.
+lto = "thin"
+# A single codegen unit gives the optimizer the whole crate at once, which helps
+# hot-path inlining at the cost of slower compile times.
+codegen-units = 1
+
 [[bin]]
 name = "main"
 path = "src/main.rs"

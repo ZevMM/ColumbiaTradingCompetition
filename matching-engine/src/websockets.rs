@@ -2,7 +2,6 @@ use actix::prelude::*;
 use actix_web::Error;
 use actix_web_actors::ws;
 use log::info;
-use std::collections::VecDeque;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -11,10 +10,49 @@ use actix_broker::BrokerSubscribe;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// O(1) token-bucket rate limiter.
+///
+/// `rate` is the sustained number of tokens (orders) per second.
+/// `capacity` is the maximum burst that can be consumed immediately.
+struct TokenBucket {
+    tokens: f64,
+    capacity: f64,
+    rate: f64,
+    last_update: Instant,
+}
+
+impl TokenBucket {
+    fn new(rate: usize, capacity: usize) -> Self {
+        let rate = rate as f64;
+        let capacity = capacity as f64;
+        Self {
+            tokens: capacity,
+            capacity,
+            rate,
+            last_update: Instant::now(),
+        }
+    }
+
+    /// Try to consume a single token. Returns true if allowed.
+    fn allow(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_update).as_secs_f64();
+        self.tokens = (self.tokens + elapsed * self.rate).min(self.capacity);
+        self.last_update = now;
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 use crate::api_messages::{
-    self, CancelConfirmMessage, CancelErrorMessage, CancelRequest, IncomingMessage,
+    CancelConfirmMessage, CancelErrorMessage, CancelRequest, IncomingMessage, JsonPayload,
     OrderConfirmMessage, OrderPlaceErrorMessage, OrderPlaceResponse,
-    OrderRequest, OutgoingMessage
+    OrderRequest,
 };
 use crate::message_types::{CloseMessage, GameStartedMessage, OpenMessage};
 use crate::orderbook::TraderId;
@@ -38,13 +76,15 @@ pub fn add_order<'a>(
     let order_request_inner = order_request;
     let symbol = &order_request_inner.symbol;
     
+    const MAX_ACTIVE_ORDERS_PER_TRADER: usize = 10_000;
+
     // Check active orders capacity
     let trader_account = accounts_data
-    .index_ref(order_request_inner.trader_id)
-    .lock()
-    .unwrap();
+        .index_ref(order_request_inner.trader_id)
+        .lock()
+        .unwrap();
 
-    if trader_account.active_orders.len() >= trader_account.active_orders.capacity() {
+    if trader_account.active_orders.len() >= MAX_ACTIVE_ORDERS_PER_TRADER {
         return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
             side: order_request_inner.order_type,
             price: order_request_inner.price,
@@ -94,16 +134,7 @@ pub fn add_order<'a>(
    // Check per-level order count
    {
        let orderbook = data.index_ref(&symbol).lock().unwrap();
-       let level_len = match order_request_inner.order_type {
-           OrderType::Buy => orderbook
-               .buy_side
-               .get(&order_request_inner.price)
-               .map_or(0, |q| q.len()),
-           OrderType::Sell => orderbook
-               .sell_side
-               .get(&order_request_inner.price)
-               .map_or(0, |q| q.len()),
-       };
+       let level_len = orderbook.level_len(order_request_inner.order_type, order_request_inner.price);
        if level_len >= 10_000 {
            return OrderPlaceResponse::OrderPlaceErrorMessage(OrderPlaceErrorMessage {
                side: order_request_inner.order_type,
@@ -117,7 +148,7 @@ pub fn add_order<'a>(
 
     // Todo: refactor into match statement, put into actix guard?
     if order_request_inner.order_type == crate::orderbook::OrderType::Buy {
-        let cent_value = &order_request_inner.amount * &order_request_inner.price;
+        let cent_value = order_request_inner.amount * order_request_inner.price;
         if (accounts_data
             .index_ref(order_request_inner.trader_id)
             .lock()
@@ -148,8 +179,6 @@ pub fn add_order<'a>(
             .unwrap()
             .net_asset_balances
             .index_ref(symbol)
-            .lock()
-            .unwrap()
             < <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap())
             && !order_request_inner.trader_id.is_price_enforcer()
         {
@@ -166,9 +195,7 @@ pub fn add_order<'a>(
                 .lock()
                 .unwrap()
                 .net_asset_balances
-                .index_ref(symbol)
-                .lock()
-                .unwrap() -= <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap();
+                .index_ref_mut(symbol) -= <usize as TryInto<i64>>::try_into(order_request_inner.amount).unwrap();
         }
     };
 
@@ -212,7 +239,7 @@ pub fn cancel_order<'a>(
     data: &crate::config::GlobalOrderBookState,
     accounts_data: &crate::config::GlobalAccountState,
     relay_server_addr: &web::Data<Addr<crate::connection_server::Server>>,
-    order_counter: &web::Data<Arc<AtomicUsize>>,
+    _order_counter: &web::Data<Arc<AtomicUsize>>,
 ) -> crate::api_messages::OrderCancelResponse<'a> {
     let cancel_request_inner = cancel_request;
     let symbol = &cancel_request_inner.symbol;
@@ -243,16 +270,13 @@ pub fn cancel_order<'a>(
                 }
                 OrderType::Sell => {
                     // increase available assets
-                    // need to dereference because each asset balance is a separate mutex (should this be changed?)
                     if !inner.trader_id.is_price_enforcer() {
                         *accounts_data
                             .index_ref(inner.trader_id)
                             .lock()
                             .unwrap()
                             .net_asset_balances
-                            .index_ref(&inner.symbol)
-                            .lock()
-                            .unwrap() +=  <usize as TryInto<i64>>::try_into(inner.amount).unwrap()
+                            .index_ref_mut(&inner.symbol) += <usize as TryInto<i64>>::try_into(inner.amount).unwrap()
                     }
                 }
             }
@@ -260,7 +284,7 @@ pub fn cancel_order<'a>(
                 CancelConfirmMessage { order_info: inner },
             );
         }
-        Err(err) => {
+        Err(_err) => {
             return crate::api_messages::OrderCancelResponse::CancelErrorMessage(
                 //to-do
                 CancelErrorMessage {
@@ -279,7 +303,7 @@ pub struct MyWebSocketActor {
     connection_ip: TraderIp,
     associated_id: TraderId,
     hb: Instant,
-    order_window: VecDeque<Instant>,
+    rate_limiter: TokenBucket,
     global_state: web::Data<GlobalState>,
     start_time: web::Data<SystemTime>,
     relay_server_addr: web::Data<Addr<crate::connection_server::Server>>,
@@ -299,17 +323,7 @@ impl MyWebSocketActor {
     }
 
     fn check_rate_limit(&mut self) -> bool {
-        let now = Instant::now();
-        let limit = crate::config::config().order_rate_limit_per_second;
-        while self.order_window.front().map_or(false, |t| now.duration_since(*t) > Duration::from_secs(1)) {
-            self.order_window.pop_front();
-        }
-        if self.order_window.len() >= limit {
-            false
-        } else {
-            self.order_window.push_back(now);
-            true
-        }
+        self.rate_limiter.allow()
     }
 }
 
@@ -409,7 +423,10 @@ pub async fn websocket(
             .unwrap(),
         associated_id: trader_id,
         hb: Instant::now(),
-        order_window: VecDeque::new(),
+        rate_limiter: TokenBucket::new(
+            crate::config::config().order_rate_limit_per_second,
+            crate::config::config().order_rate_limit_burst,
+        ),
         global_state: state_data.clone(),
         start_time: start_time.clone(),
         relay_server_addr: relay_server_addr.clone(),
@@ -458,7 +475,7 @@ impl Actor for MyWebSocketActor {
                 }
             }
             Err(poisoned) => {
-                let mut guard = poisoned.into_inner();
+                let mut guard: std::sync::MutexGuard<'_, crate::accounts::TraderAccount> = poisoned.into_inner();
                 if guard.current_actor.as_ref() == Some(&my_addr) {
                     guard.current_actor = None;
                     warn!("Recovered from poisoned mutex for trader {:?}", account_id);
@@ -473,29 +490,13 @@ impl Actor for MyWebSocketActor {
     }
 }
 
-/// Define handler for `Fill` message, triggers when one of your orders is involved in a trade
-impl Handler<Arc<crate::api_messages::OrderFillMessage>> for MyWebSocketActor {
+/// Handler for pre-serialized JSON payloads.
+/// Fill messages and broadcast market-data messages are already encoded before
+/// reaching the actor, so the actor just forwards the string to the WebSocket.
+impl Handler<JsonPayload> for MyWebSocketActor {
     type Result = ();
-
-    fn handle(&mut self, msg: Arc<crate::api_messages::OrderFillMessage>, ctx: &mut Self::Context) {
-        // let fill_event = msg;
-        let hack_msg = api_messages::OutgoingMessage::OrderFillMessage(*msg);
-
-        ctx.text(serde_json::to_string(&hack_msg).unwrap());
-    }
-}
-
-
-// TODO: generalize to Handler<Arc<T>> for generic message types
-// Implement a marker trait (something like LOBChangeMessage)
-// Handling these market data event messages is just sending out json'd version of the message struct
-// Key word: Blanket implementations
-impl Handler<Arc<OutgoingMessage>> for MyWebSocketActor {
-    type Result = ();
-    fn handle(&mut self, msg: Arc<OutgoingMessage>, ctx: &mut Self::Context) {
-        // there has to be a nicer way to do this, but cant figure out how to access inner type when doing a default match
-        // these messages are sent by Server detailed in connection_server.rs
-        ctx.text(serde_json::to_string(&*msg).unwrap());
+    fn handle(&mut self, msg: JsonPayload, ctx: &mut Self::Context) {
+        ctx.text((*(msg.0)).to_string());
     }
 }
 
@@ -574,11 +575,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocketActor 
                             );
 
                             match &res {
-                                OrderPlaceResponse::OrderPlaceErrorMessage(msg) => {
+                                OrderPlaceResponse::OrderPlaceErrorMessage(_msg) => {
                                     ctx.text(serde_json::to_string(&res).unwrap());
                                 }
-                                OrderPlaceResponse::OrderConfirmMessage(msg) => {
-
+                                OrderPlaceResponse::OrderConfirmMessage(_msg) => {
                                     ctx.text(serde_json::to_string(&res).unwrap());
                                 }
                             }

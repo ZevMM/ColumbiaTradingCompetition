@@ -1,10 +1,12 @@
+use crate::api_messages::JsonPayload;
 use crate::config;
 use crate::orderbook::Order;
+use crate::orderbook::OrderID;
 use crate::websockets;
 use actix::Addr;
 use serde::Deserialize;
 use serde::Serialize;
-use std::sync::Arc;
+use std::collections::HashMap;
 
 
 pub type Password = [char; 4];
@@ -16,8 +18,8 @@ pub struct TraderAccount {
     pub current_actor: Option<Addr<websockets::MyWebSocketActor>>,
     pub password: Password,
 
-    // all active orders for syncing purposes. Maybe should be organized by symbol/price level to allow for quicker removal/access?
-    pub active_orders: Vec<Order>,
+    // Active orders keyed by order ID for O(1) lookup/update on fills and cancels.
+    pub active_orders: HashMap<OrderID, Order>,
 
     pub net_cents_balance: usize,
     // asset_balances, net_asset_balances updated on fill event, and so should be current
@@ -32,12 +34,10 @@ fn ret_none() -> Option<Addr<websockets::MyWebSocketActor>> {
 }
 
 impl TraderAccount {
-    pub fn push_fill(&mut self, fill_event: Arc<crate::api_messages::OrderFillMessage>) {
+    /// Push a pre-serialized JSON fill notification to the trader's WebSocket actor.
+    pub fn push_fill(&mut self, fill_event: JsonPayload) {
         if let Some(addr) = &self.current_actor {
-            match addr.try_send(fill_event) {
-                Ok(_) => {}
-                Err(_) => {}
-            }
+            let _ = addr.try_send(fill_event);
         }
     }
 }
@@ -48,13 +48,13 @@ pub fn quickstart_trader_account(
     start_asset_balance: i64,
     password: Password,
 ) -> TraderAccount {
-    let asset_balances = config::AssetBalances::new();
-    let net_asset_balances = config::AssetBalances::new();
+    let mut asset_balances = config::AssetBalances::new();
+    let mut net_asset_balances = config::AssetBalances::new();
 
     // making it just give the same number of shares for each asset cus I feel lazy
     for symbol in config::TickerSymbol::all() {
-        *asset_balances.index_ref(&symbol).lock().unwrap() = start_asset_balance;
-        *net_asset_balances.index_ref(&symbol).lock().unwrap() = start_asset_balance;
+        *asset_balances.index_ref_mut(&symbol) = start_asset_balance;
+        *net_asset_balances.index_ref_mut(&symbol) = start_asset_balance;
     }
 
     TraderAccount {
@@ -65,6 +65,6 @@ pub fn quickstart_trader_account(
         net_asset_balances,
         current_actor: None,
         password,
-        active_orders: Vec::with_capacity(10000),
+        active_orders: HashMap::with_capacity(256),
     }
 }
