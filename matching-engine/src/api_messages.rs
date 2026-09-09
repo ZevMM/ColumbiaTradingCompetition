@@ -2,6 +2,7 @@ use actix::Message;
 use serde::Deserialize;
 use serde::Serialize;
 use core::fmt;
+use std::sync::Arc;
 use crate::accounts;
 use crate::config;
 use crate::config::TraderId;
@@ -174,6 +175,13 @@ pub enum OutgoingMessage {
 
 #[derive(Debug, Error, Clone, Serialize)]
 pub struct CancelIDNotFoundError;
+
+/// Pre-serialized JSON payload for WebSocket fan-out.
+/// Carrying an `Arc<str>` lets us encode a market-data or fill message once
+/// and clone only the reference count for each connected client.
+#[derive(Message, Clone)]
+#[rtype(result = "()")]
+pub struct JsonPayload(pub Arc<str>);
 
 impl fmt::Display for CancelIDNotFoundError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

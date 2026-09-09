@@ -2,9 +2,8 @@ use actix::prelude::*;
 use actix_web::Error;
 use actix_web_actors::ws;
 use log::info;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
-use crate::api_messages::OutgoingMessage;
+use crate::api_messages::JsonPayload;
 use crate::message_types::{CloseMessage, OpenMessage};
 use actix_web::{web, HttpRequest, HttpResponse};
 extern crate env_logger;
@@ -98,21 +97,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MarketDataActor {
 }
 
 // Handle market data messages
-impl Handler<Arc<OutgoingMessage>> for MarketDataActor {
+impl Handler<JsonPayload> for MarketDataActor {
     type Result = ();
-    
-    fn handle(&mut self, msg: Arc<OutgoingMessage>, ctx: &mut Self::Context) {
-        // Forward all market data messages
-        match *msg {
-            OutgoingMessage::NewRestingOrderMessage(_) |
-            OutgoingMessage::TradeOccurredMessage(_) |
-            OutgoingMessage::CancelOccurredMessage(_) => {
-                if let Ok(json) = serde_json::to_string(&*msg) {
-                    ctx.text(json);
-                }
-            }
-            _ => {} // Ignore other message types
-        }
+
+    fn handle(&mut self, msg: JsonPayload, ctx: &mut Self::Context) {
+        // Forward all pre-serialized market data messages
+        ctx.text((*(msg.0)).to_string());
     }
 }
 

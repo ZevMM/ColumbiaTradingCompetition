@@ -18,9 +18,15 @@ pub type TraderIp = std::net::Ipv4Addr;
 
 static CONFIG: OnceLock<ExchangeConfig> = OnceLock::new();
 
+fn default_burst() -> usize {
+    0
+}
+
 #[derive(Debug, Deserialize)]
 struct RawConfig {
     order_rate_limit_per_second: usize,
+    #[serde(default = "default_burst")]
+    order_rate_limit_burst: usize,
     start_asset_balance: i64,
     start_cents_balance: usize,
     assets: Vec<RawAsset>,
@@ -47,6 +53,7 @@ pub struct ExchangeConfig {
     pub start_asset_balance: i64,
     pub price_enforcer_id: TraderId,
     pub order_rate_limit_per_second: usize,
+    pub order_rate_limit_burst: usize,
 }
 
 pub fn init_config(path: &str) {
@@ -72,6 +79,14 @@ pub fn init_config(path: &str) {
         .position(|n| n == "Price_Enforcer")
         .expect("Config must contain a Price_Enforcer account");
 
+    // If no explicit burst is configured, default to the sustained rate so a
+    // client can burst up to one second's worth of orders.
+    let burst = if raw.order_rate_limit_burst > 0 {
+        raw.order_rate_limit_burst
+    } else {
+        raw.order_rate_limit_per_second
+    };
+
     let cfg = ExchangeConfig {
         ticker_names,
         trader_names,
@@ -80,6 +95,7 @@ pub fn init_config(path: &str) {
         start_asset_balance: raw.start_asset_balance,
         price_enforcer_id: TraderId(price_enforcer_idx as u16),
         order_rate_limit_per_second: raw.order_rate_limit_per_second,
+        order_rate_limit_burst: burst,
     };
 
     CONFIG.set(cfg).expect("Config already initialised");
@@ -212,24 +228,28 @@ impl<'de> Deserialize<'de> for TraderId {
 }
 
 // ---------------------------------------------------------------------------
-// AssetBalances  –  Vec<Mutex<i64>>
+// AssetBalances  –  plain Vec<i64> (account mutex provides serialization)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssetBalances {
-    balances: Vec<Mutex<i64>>,
+    balances: Vec<i64>,
 }
 
 impl AssetBalances {
     pub fn new() -> Self {
         let n = TickerSymbol::count();
         Self {
-            balances: (0..n).map(|_| Mutex::new(0)).collect(),
+            balances: vec![0; n],
         }
     }
 
-    pub fn index_ref(&self, symbol: &TickerSymbol) -> &Mutex<i64> {
+    pub fn index_ref(&self, symbol: &TickerSymbol) -> &i64 {
         &self.balances[symbol.0 as usize]
+    }
+
+    pub fn index_ref_mut(&mut self, symbol: &TickerSymbol) -> &mut i64 {
+        &mut self.balances[symbol.0 as usize]
     }
 }
 
@@ -237,10 +257,9 @@ impl Serialize for AssetBalances {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(Some(self.balances.len()))?;
-        for (i, m) in self.balances.iter().enumerate() {
+        for (i, val) in self.balances.iter().enumerate() {
             let sym = TickerSymbol(i as u16);
-            let val = *m.lock().unwrap();
-            map.serialize_entry(sym.name(), &val)?;
+            map.serialize_entry(sym.name(), val)?;
         }
         map.end()
     }
@@ -251,10 +270,10 @@ impl<'de> Deserialize<'de> for AssetBalances {
         let map: std::collections::HashMap<String, i64> =
             std::collections::HashMap::deserialize(deserializer)?;
         let n = TickerSymbol::count();
-        let balances: Vec<Mutex<i64>> = (0..n).map(|_| Mutex::new(0)).collect();
+        let mut balances = vec![0i64; n];
         for (name, val) in map {
             if let Ok(sym) = TickerSymbol::from_str(&name) {
-                *balances[sym.0 as usize].lock().unwrap() = val;
+                balances[sym.0 as usize] = val;
             }
         }
         Ok(AssetBalances { balances })
@@ -272,7 +291,7 @@ pub struct GlobalOrderBookState {
 
 impl GlobalOrderBookState {
     pub fn new() -> Self {
-        let cfg = config();
+        let _cfg = config();
         let books = TickerSymbol::all()
             .into_iter()
             .map(|sym| Mutex::new(crate::orderbook::quickstart_order_book(sym)))

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef} from 'react'
+import { useState, useEffect, useRef, useCallback} from 'react'
 import './App.css'
 import Login from './Login/Login'
 import Console from './Console/Console'
@@ -7,6 +7,7 @@ import EndScreen from './Views/EndScreen'
 import ErrorPopup from './Error'
 
 const addr = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/orders/ws`
+const MAX_PRICE_HISTORY = 5000
 
 function App() {
   const [user, setUser] = useState(null)
@@ -23,75 +24,110 @@ function App() {
   const tmpFillRef = useRef({})
   const [final_score, setFinalScore] = useState(0)
   const [retry, setRetry] = useState(0)
+  const pendingGameUpdates = useRef([])
+  const gameFrame = useRef(null)
+  const feedSequence = useRef(0)
+  const telemetryRef = useRef({sequence: 0, lastMessageAt: null})
+  const [connectionStatus, setConnectionStatus] = useState('disconnected')
+  const [telemetry, setTelemetry] = useState(telemetryRef.current)
+  const queueGameUpdate = useCallback((update) => {
+    pendingGameUpdates.current.push(update)
+    if (gameFrame.current !== null) return
+    gameFrame.current = requestAnimationFrame(() => {
+      const updates = pendingGameUpdates.current.splice(0)
+      gameFrame.current = null
+      setGame(current => updates.reduce((next, apply) => apply(next), current))
+    })
+  }, [])
+
+  useEffect(() => () => {
+    if (gameFrame.current !== null) cancelAnimationFrame(gameFrame.current)
+  }, [])
 
   useEffect(() => {
-    console.log(user)
+    const id = setInterval(() => setTelemetry({...telemetryRef.current}), 500)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
     if (user) {
         kickedref.current = false;
+        feedSequence.current = 0;
+        telemetryRef.current = {sequence: 0, lastMessageAt: null}
+        setConnectionStatus('connecting')
         let newws = new WebSocket(addr, [`${user.uid}|${user.pwd}`]);
         newws.onerror = (error) => {
           console.error("WebSocket error:", error);
           setUser(null);
           setWs(null);
           setErr("Connection failed — check username/password, or try again in a few seconds");
+          setConnectionStatus('disconnected')
           setState(0);
         };
-        newws.onopen = () => {
-          console.log("ws opened");
-        }
+        newws.onopen = () => setConnectionStatus('connected')
         newws.onclose = () => {
-          console.log("ws closed", retry, "kicked:", kickedref.current);
+          setConnectionStatus(kickedref.current ? 'disconnected' : 'reconnecting')
           if (kickedref.current) {
             // Don't reconnect — we were kicked by another session
             return;
           }
-          console.log("retrying");
           setRetry(retry + 1);
         };
         newws.onmessage = function(e) {
-          console.log(e)
-          let [type, body] = Object.entries(JSON.parse(e.data))[0]
-          console.log(type, body);
-          switch (type) {
+          telemetryRef.current.lastMessageAt = Date.now()
+          const raw = JSON.parse(e.data)
+          const messages = Array.isArray(raw) ? raw : [raw]
+          for (const msg of messages) {
+            let [type, body] = Object.entries(msg)[0]
+            if (typeof body?.sequence === 'number') {
+              if (body.sequence <= feedSequence.current) continue
+              if (feedSequence.current > 0 && body.sequence !== feedSequence.current + 1) {
+                newws.send(JSON.stringify({MessageType: "GameStateRequest"}))
+              }
+              feedSequence.current = body.sequence
+              telemetryRef.current.sequence = body.sequence
+            }
+            switch (type) {
             case "GameStartedMessage":
               setState(1)
               break;
-            case "GameEndMessage":
+            case "GameEndMessage": {
               setState(2)
 
-              let urpl = Object.entries(accountref.current.asset_balances).reduce(
-                (s, [k,v], i) => {
+              const urpl = Object.entries(accountref.current.asset_balances).reduce(
+                (s, [k,v]) => {
                     return (s + (100 * v * (gameref.current[k].price_history?.at(-1)?.[1] ?? 0)) / (100 + v))
                 }, 0
               )
-              let net_value = urpl + accountref.current.cents_balance;
+              const net_value = urpl + accountref.current.cents_balance;
 
               setFinalScore(net_value.toFixed(0));
               break;
+            }
             case "GameState":
+              pendingGameUpdates.current = []
               setGame(body)
               break;
             case "AccountInfo":
               setAccount(body)
               break;
             case "TradeOccurredMessage": {
-              let {amount, symbol, resting_side, price, time} = body
-              setGame(prevGame => {
+              let {amount, symbol, resting_side, price, time, sequence} = body
+              queueGameUpdate(prevGame => {
                 const sideKey = resting_side == "Buy" ? 'buy_side' : 'sell_side'
                 const oldSide = prevGame[symbol][sideKey]
-                const cur = oldSide[price] || 0
                 const newSide = {...oldSide}
-                if (cur - amount <= 0) {
-                  delete newSide[price]
-                } else {
-                  newSide[price] = cur - amount
+                if (sequence === undefined) {
+                  const cur = oldSide[price] || 0
+                  if (cur - amount <= 0) delete newSide[price]
+                  else newSide[price] = cur - amount
                 }
                 return {
                   ...prevGame,
                   [symbol]: {
                     ...prevGame[symbol],
                     [sideKey]: newSide,
-                    price_history: [...prevGame[symbol].price_history, [time, price, amount]]
+                    price_history: [...prevGame[symbol].price_history.slice(-(MAX_PRICE_HISTORY - 1)), [time ?? Math.floor(Date.now() / 1000), price, amount]]
                   }
                 }
               });
@@ -99,7 +135,7 @@ function App() {
             }
             case "NewRestingOrderMessage": {
               let {side, amount, symbol, price} = body
-              setGame(prevGame => {
+              queueGameUpdate(prevGame => {
                 const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
                 const oldSide = prevGame[symbol][sideKey]
                 return {
@@ -113,6 +149,17 @@ function App() {
                   }
                 }
               });
+              break;
+            }
+            case "BookLevelUpdate": {
+              const {side, symbol, price, quantity} = body
+              queueGameUpdate(prevGame => {
+                const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
+                const newSide = {...prevGame[symbol][sideKey]}
+                if (quantity === 0) delete newSide[price]
+                else newSide[price] = quantity
+                return {...prevGame, [symbol]: {...prevGame[symbol], [sideKey]: newSide}}
+              })
               break;
             }
             case "OrderPlaceErrorMessage":
@@ -236,7 +283,7 @@ function App() {
               break;
             case "CancelOccurredMessage": {
               let {symbol, price, side, amount} = body
-              setGame(prevGame => {
+              queueGameUpdate(prevGame => {
                 const sideKey = side == "Buy" ? 'buy_side' : 'sell_side'
                 const oldSide = prevGame[symbol][sideKey]
                 const cur = oldSide[price] || 0
@@ -258,20 +305,22 @@ function App() {
             }
               
           }
-        };
+        }
+      };
     
         setWs(newws);
       }
-    }, [user, retry])
+    }, [user, retry, queueGameUpdate])
 
     useEffect(() => {gameref.current = game}, [game])
     useEffect(() => {accountref.current = account}, [account])
+    const clearError = useCallback(() => setErr(null), [])
   
   return (
     <>
-      {err && <ErrorPopup message={err} clearError={() => setErr(null)} />}
+      {err && <ErrorPopup message={err} clearError={clearError} />}
       {state === 2 && <EndScreen final_score={final_score} />}
-      {ws && user && state === 1 && <Console ws={ws} user={user} game={game} account={account} trades={trades} />}
+      {ws && user && state === 1 && <Console ws={ws} user={user} game={game} account={account} trades={trades} connectionStatus={connectionStatus} telemetry={telemetry} />}
       {ws && user && state === 0 && <WaitScreen />}
       {(!ws || !user) && <Login user={user} setUser={setUser} setWs={setWs}/>}
     </>
